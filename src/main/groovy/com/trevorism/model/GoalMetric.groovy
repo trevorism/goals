@@ -11,7 +11,7 @@ class GoalMetric implements Owned {
     String unit
     String description
     String type
-    String role
+    String measures
     String direction
 
     Double baseline

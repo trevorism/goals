@@ -67,6 +67,8 @@ Then(~/^the tree shows the step with its metric$/) { ->
     assert step.metrics[0].choices*.value == ["yes", "no"]
     assert step.metrics[0].frequency == "daily"
     assert step.metrics[0].source == "manual"
+    assert step.metrics[0].measures == "outcome"
+    assert step.metrics[0].target == 0.8
 }
 
 Then(~/^the observation is labelled "(.*)"$/) { String label ->

@@ -5,7 +5,7 @@ import com.trevorism.model.Goal
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
 import com.trevorism.model.MetricDirection
-import com.trevorism.model.MetricRole
+import com.trevorism.model.MetricMeasures
 import com.trevorism.model.MetricSource
 import com.trevorism.model.MetricType
 import jakarta.inject.Named
@@ -43,7 +43,7 @@ class MetricService {
         metric.goalId = goal.id
         metric.rootId = goal.treeRootId()
         metric.type = metric.type ?: MetricType.NUMERIC
-        metric.role = metric.role ?: MetricRole.OUTCOME
+        metric.measures = metric.measures ?: MetricMeasures.OUTCOME
         metric.enabled = metric.enabled != null ? metric.enabled : true
         metric.frequency = metric.frequency ?: Frequency.DAILY
         metric.source = metric.source ?: MetricSource.MANUAL
@@ -62,7 +62,7 @@ class MetricService {
         existing.name = changes.name ?: existing.name
         existing.unit = changes.unit ?: existing.unit
         existing.description = changes.description ?: existing.description
-        existing.role = changes.role ?: existing.role
+        existing.measures = changes.measures ?: existing.measures
         existing.direction = changes.direction ?: existing.direction
         existing.baseline = changes.baseline != null ? changes.baseline : existing.baseline
         existing.target = changes.target != null ? changes.target : existing.target
@@ -101,7 +101,7 @@ class MetricService {
     private static void validate(GoalMetric metric) {
         require(metric.name?.trim() as boolean, "name is required")
         requireOneOf(metric.type, MetricType.ALL, "type")
-        requireOneOf(metric.role, MetricRole.ALL, "role")
+        requireOneOf(metric.measures, MetricMeasures.ALL, "measures")
         requireOneOf(metric.frequency, Frequency.ALL, "frequency")
         requireOneOf(metric.source, MetricSource.ALL, "source")
         if (metric.type in [MetricType.NUMERIC, MetricType.SCALE]) {

@@ -1,6 +1,6 @@
 package com.trevorism.model
 
-class MetricRole {
+class MetricMeasures {
 
     static final String OUTCOME = "outcome"
     static final String EFFORT = "effort"

@@ -137,7 +137,7 @@ allowed values are listed in a values class (constants plus an `ALL` list), chec
 |---|---|---|
 | `GoalStatus` | `Goal.status` | `active` \| `completed` \| `missed` \| `abandoned` |
 | `MetricType` | `GoalMetric.type` | `numeric` \| `boolean` \| `scale` \| `choice` \| `text` |
-| `MetricRole` | `GoalMetric.role` | `outcome` (lag) \| `effort` (lead) |
+| `MetricMeasures` | `GoalMetric.measures` | `outcome` (lag) \| `effort` (lead) |
 | `MetricDirection` | `GoalMetric.direction` | `increase` \| `decrease` \| `maintain` |
 | `Frequency` | `GoalMetric.frequency` | `daily` \| `weekly` \| `monthly` |
 | `MetricSource` | `GoalMetric.source`, `GoalObservation.source` | `manual` \| `prompt` \| `http` \| `event` \| `aggregation` |
@@ -166,7 +166,7 @@ allowed values are listed in a values class (constants plus an `ALL` list), chec
 | id, ownerid, goalid, rootid | `rootid` is copied from the goal so a whole tree's metrics load with one filter |
 | name, unit, description | |
 | type | `MetricType`; `numeric` by default; can't change after creation |
-| role | `MetricRole`; `outcome` by default |
+| measures | `MetricMeasures`: whether the metric tracks the result (`outcome`) or the work toward it (`effort`); `outcome` by default |
 | direction | `MetricDirection`; numeric and scale only; `increase` by default |
 | baseline, target, tolerance | For a boolean metric, `target` is the required share of yes answers, e.g. 0.857 (6/7), in (0, 1]. `tolerance` is required for `maintain`. |
 | scalemin, scalemax | scale only |

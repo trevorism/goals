@@ -6,7 +6,7 @@ import com.trevorism.model.Goal
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
 import com.trevorism.model.MetricDirection
-import com.trevorism.model.MetricRole
+import com.trevorism.model.MetricMeasures
 import com.trevorism.model.MetricSource
 import com.trevorism.model.MetricType
 import com.trevorism.support.TestStore
@@ -31,7 +31,7 @@ class MetricServiceTest {
         assert metric.goalId == root.id
         assert metric.rootId == root.id
         assert metric.type == MetricType.NUMERIC
-        assert metric.role == MetricRole.OUTCOME
+        assert metric.measures == MetricMeasures.OUTCOME
         assert metric.direction == MetricDirection.INCREASE
         assert metric.enabled
         assert metric.frequency == Frequency.DAILY
@@ -75,7 +75,7 @@ class MetricServiceTest {
     void testTypeSpecificValidation() {
         assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "")) }
         assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", type: "vibes")) }
-        assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", role: "hope")) }
+        assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", measures: "hope")) }
         assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", direction: "sideways")) }
         assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", type: MetricType.SCALE, scaleMin: 5, scaleMax: 1)) }
         assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", type: MetricType.CHOICE, choices: [new Choice(label: "only")])) }
