@@ -9,6 +9,7 @@ import jakarta.inject.Named
 import jakarta.inject.Singleton
 
 import static com.trevorism.service.Validation.require
+import static com.trevorism.service.Validation.requireOneOf
 
 @Singleton
 class ObservationService {
@@ -31,7 +32,8 @@ class ObservationService {
         GoalMetric metric = metricRepository.get(ownerId, metricId)
         observation.metricId = metric.id
         observation.observedAt = observation.observedAt ?: new Date()
-        observation.source = observation.source ?: MetricSourceType.MANUAL
+        observation.metricSource = observation.metricSource ?: MetricSourceType.MANUAL
+        requireOneOf(observation.metricSource, MetricSourceType.ALL, "metricSource")
         observation.missed = observation.missed ?: false
         observation.createdDate = new Date()
         normalizeAgainst(metric, observation)

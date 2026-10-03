@@ -74,6 +74,7 @@ Then(~/^the tree shows the step with its metric$/) { ->
 Then(~/^the observation is labelled "(.*)"$/) { String label ->
     assert observation.label == label
     assert observation.choice == "yes"
+    assert observation.metricSource == "manual"
     assert observation.value == 1
     assert fetchObservations()*.id == [observation.id]
 }

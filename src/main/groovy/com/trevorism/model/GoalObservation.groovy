@@ -11,7 +11,7 @@ class GoalObservation implements Owned {
     String choice
     String label
     String note
-    String source
+    String metricSource
     String sourceRef
     Boolean missed
 

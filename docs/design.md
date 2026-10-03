@@ -186,7 +186,7 @@ from stored entities:
 | choice | Boolean and choice metrics: the selected choice's value, matching prompt's `selectedChoices` |
 | label | The selected choice's label, or the text answer |
 | note | |
-| source, sourceref | `MetricSourceType`, e.g. `prompt` + answerId, `manual` |
+| metricsource, sourceref | `metricsource` is how the value was collected (`MetricSourceType`); `sourceref` is the id of the record it came from, e.g. `prompt` + answerId. Manual entries have no `sourceref`. |
 | missed | `true` for a period nobody answered |
 
 ### 4.4 Adjustment

@@ -35,10 +35,11 @@ class ObservationServiceTest {
         assert observation.metricId == weight.id
         assert observation.ownerId == OWNER
         assert observation.observedAt
-        assert observation.source == MetricSourceType.MANUAL
+        assert observation.metricSource == MetricSourceType.MANUAL
         assert !observation.missed
         assert store.metricRepository.get(OWNER, weight.id).lastCollectedAt
         assertBadRequest { service.create(OWNER, weight.id, new GoalObservation()) }
+        assertBadRequest { service.create(OWNER, weight.id, new GoalObservation(value: 1, metricSource: "rumor")) }
     }
 
     @Test
