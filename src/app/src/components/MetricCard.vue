@@ -2,17 +2,23 @@
 import { computed, onMounted, ref } from 'vue'
 import { errorMessage, metricsApi, observationsApi } from '../api.js'
 import { describeObservation, describeTarget, formatDay } from '../forms.js'
+import { describeMetricProgress, describeScore } from '../progress.js'
 import { metricTypeLabels } from '../types.js'
+import MetricChart from './MetricChart.vue'
 import MetricForm from './MetricForm.vue'
 import ObservationEntry from './ObservationEntry.vue'
+import ProgressStatus from './ProgressStatus.vue'
 
 const RECENT_COUNT = 10
 
 const props = defineProps({
-  metric: { type: Object, required: true }
+  metric: { type: Object, required: true },
+  goal: { type: Object, required: true },
+  metricProgress: { type: Object, default: null },
+  now: { type: [Date, String], default: null }
 })
 
-const emit = defineEmits(['changed'])
+const emit = defineEmits(['changed', 'recorded'])
 
 const observations = ref([])
 const editing = ref(false)
@@ -21,6 +27,8 @@ const error = ref('')
 
 const recent = computed(() => [...observations.value].reverse().slice(0, RECENT_COUNT))
 const target = computed(() => describeTarget(props.metric))
+const facts = computed(() => describeMetricProgress(props.metric, props.metricProgress))
+const chartNow = computed(() => props.now ?? new Date())
 
 async function loadObservations() {
   try {
@@ -36,6 +44,7 @@ async function record(payload) {
   try {
     await observationsApi.create(props.metric.id, payload)
     await loadObservations()
+    emit('recorded')
   } catch (e) {
     error.value = errorMessage(e)
   } finally {
@@ -50,6 +59,7 @@ async function removeObservation(observation) {
   try {
     await observationsApi.remove(observation.id)
     await loadObservations()
+    emit('recorded')
   } catch (e) {
     error.value = errorMessage(e)
   }
@@ -99,6 +109,12 @@ onMounted(loadObservations)
         <p class="metric-summary text-sm text-slate-500">
           {{ metric.frequency }}<span v-if="target"> · target {{ target }}</span>
         </p>
+        <div v-if="metricProgress && metric.type !== 'text'" class="metric-progress flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+          <progress-status :status="metricProgress.status" />
+          <span v-if="metricProgress.score != null" class="metric-score text-slate-700">{{ describeScore(metric, metricProgress.score) }}</span>
+          <span v-for="fact in facts" :key="fact" class="metric-fact text-slate-500">· {{ fact }}</span>
+        </div>
+        <metric-chart :metric="metric" :goal="goal" :observations="observations" :metric-progress="metricProgress" :now="chartNow" />
         <observation-entry :metric="metric" :saving="saving" @record="record" />
         <p v-if="error" class="card-error text-sm text-red-600">{{ error }}</p>
         <ul v-if="recent.length" class="recent flex flex-col gap-1 text-sm">

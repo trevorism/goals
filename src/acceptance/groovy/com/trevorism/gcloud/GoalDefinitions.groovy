@@ -80,6 +80,20 @@ Then(~/^the observation is labelled "(.*)"$/) { String label ->
     assert fetchObservations()*.id == [observation.id]
 }
 
+Then(~/^the progress shows the step's metric meeting its target$/) { ->
+    fetchProgress()
+    assert progress.asOf
+    assert progress.goals*.goalId.toSorted() == [root.id, child.id].toSorted()
+    Map metricProgress = progress.metrics.find { it.metricId == metric.id }
+    assert metricProgress.adherence == 1
+    assert metricProgress.score == 1
+    assert metricProgress.status == "on_track"
+    assert metricProgress.currentStreak == 1
+    Map rootProgress = progress.goals.find { it.goalId == root.id }
+    assert rootProgress.effortProgress == 1
+    assert rootProgress.outcomeProgress == null
+}
+
 Then(~/^the adjustment is attached to the root goal$/) { ->
     assert adjustment.goalId == root.id
     assert adjustment.metricIds == [metric.id]

@@ -1,3 +1,11 @@
+## 0.4.0
+
+- Progress: each goal shows its status (ahead, on track, at risk, behind, no data), outcome and effort meters with a marker for where the plan says it should be, and how much of its time has passed. The tree shows each sub-goal's progress.
+- Metrics show their score, status and trend: a projection to the end date and when the target will be reached for numbers and scales, adherence and streaks for yes/no habits.
+- Charts for every metric type except text: values with the plan, target and trend lines, a rolling adherence line for yes/no habits, and answers on a worst-to-best axis for choices.
+- New route `GET /api/goal/{id}/progress` computes progress for a goal's whole subtree.
+- Local `gradle run` rebuilds the UI when its source changes.
+
 ## 0.3.0
 
 - Goals UI: a goal list, a goal page with a collapsible tree of sub-goals, editing, status changes (complete, abandon, reopen) and delete.

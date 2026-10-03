@@ -22,7 +22,7 @@ class RouteSecurityTest {
             controller.declaredMethods.findAll { Method method -> ROUTE_ANNOTATIONS.any { method.isAnnotationPresent(it) } }
         }
 
-        assert routes.size() == 20
+        assert routes.size() == 21
         routes.each { Method route ->
             Secure secure = route.getAnnotation(Secure)
             assert secure, "${route.declaringClass.simpleName}.${route.name} has no @Secure"

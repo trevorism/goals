@@ -2,9 +2,11 @@ package com.trevorism.controller
 
 import com.trevorism.model.Goal
 import com.trevorism.model.GoalTreeNode
+import com.trevorism.model.progress.TreeProgress
 import com.trevorism.secure.Roles
 import com.trevorism.secure.Secure
 import com.trevorism.service.GoalService
+import com.trevorism.service.ProgressService
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -22,6 +24,9 @@ class GoalController {
 
     @Inject
     GoalService goalService
+
+    @Inject
+    ProgressService progressService
 
     @Tag(name = "Goal Operations")
     @Operation(summary = "List the root goals of the current user **Secure")
@@ -77,5 +82,13 @@ class GoalController {
     @Secure(Roles.USER)
     GoalTreeNode tree(String id, Authentication authentication) {
         goalService.tree(RequesterIdentity.of(authentication), id)
+    }
+
+    @Tag(name = "Goal Operations")
+    @Operation(summary = "Progress, status and trend fits for a goal's subtree and its metrics **Secure")
+    @Get(value = "{id}/progress", produces = MediaType.APPLICATION_JSON)
+    @Secure(Roles.USER)
+    TreeProgress progress(String id, Authentication authentication) {
+        progressService.progress(RequesterIdentity.of(authentication), id)
     }
 }

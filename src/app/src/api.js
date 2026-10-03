@@ -6,6 +6,7 @@ export const goalsApi = {
   listRoots: () => data(axios.get('/api/goal')),
   get: (id) => data(axios.get(`/api/goal/${id}`)),
   tree: (id) => data(axios.get(`/api/goal/${id}/tree`)),
+  progress: (id) => data(axios.get(`/api/goal/${id}/progress`)),
   createRoot: (goal) => data(axios.post('/api/goal', goal)),
   createChild: (parentId, goal) => data(axios.post(`/api/goal/${parentId}/child`, goal)),
   update: (id, goal) => data(axios.put(`/api/goal/${id}`, goal)),
