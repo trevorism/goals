@@ -4,8 +4,8 @@ import com.trevorism.model.Choice
 import com.trevorism.model.Goal
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
-import com.trevorism.model.MetricSource
-import com.trevorism.model.MetricType
+import com.trevorism.model.types.MetricSourceType
+import com.trevorism.model.types.MetricType
 import com.trevorism.support.TestStore
 import org.junit.jupiter.api.Test
 
@@ -35,7 +35,7 @@ class ObservationServiceTest {
         assert observation.metricId == weight.id
         assert observation.ownerId == OWNER
         assert observation.observedAt
-        assert observation.source == MetricSource.MANUAL
+        assert observation.source == MetricSourceType.MANUAL
         assert !observation.missed
         assert store.metricRepository.get(OWNER, weight.id).lastCollectedAt
         assertBadRequest { service.create(OWNER, weight.id, new GoalObservation()) }

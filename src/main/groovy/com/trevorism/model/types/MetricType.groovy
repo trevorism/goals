@@ -1,4 +1,4 @@
-package com.trevorism.model
+package com.trevorism.model.types
 
 class MetricType {
 

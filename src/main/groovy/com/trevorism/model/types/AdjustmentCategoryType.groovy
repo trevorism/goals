@@ -1,6 +1,6 @@
-package com.trevorism.model
+package com.trevorism.model.types
 
-class AdjustmentCategory {
+class AdjustmentCategoryType {
 
     static final String HABIT = "habit"
     static final String TOOL = "tool"

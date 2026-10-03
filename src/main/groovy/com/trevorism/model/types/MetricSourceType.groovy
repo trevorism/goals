@@ -1,6 +1,6 @@
-package com.trevorism.model
+package com.trevorism.model.types
 
-class MetricSource {
+class MetricSourceType {
 
     static final String MANUAL = "manual"
     static final String PROMPT = "prompt"

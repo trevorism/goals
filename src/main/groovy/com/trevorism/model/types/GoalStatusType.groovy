@@ -1,6 +1,6 @@
-package com.trevorism.model
+package com.trevorism.model.types
 
-class GoalStatus {
+class GoalStatusType {
 
     static final String ACTIVE = "active"
     static final String COMPLETED = "completed"

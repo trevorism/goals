@@ -4,10 +4,10 @@ import com.trevorism.model.Goal
 import com.trevorism.model.GoalAdjustment
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
-import com.trevorism.model.GoalStatus
 import com.trevorism.model.GoalTreeNode
-import com.trevorism.model.MetricDirection
-import com.trevorism.model.MetricType
+import com.trevorism.model.types.GoalStatusType
+import com.trevorism.model.types.MetricDirectionType
+import com.trevorism.model.types.MetricType
 import com.trevorism.support.TestStore
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.exceptions.HttpStatusException
@@ -31,7 +31,7 @@ class GoalServiceTest {
         assert root.ownerId == OWNER
         assert root.parentId == null
         assert root.rootId == null
-        assert root.status == GoalStatus.ACTIVE
+        assert root.status == GoalStatusType.ACTIVE
         assert root.completedDate == null
         assert root.createdDate
         assert root.treeRootId() == root.id
@@ -109,7 +109,7 @@ class GoalServiceTest {
     void testClosingAGoalRecordsTheCompletionDate() {
         Goal root = service.createRoot(OWNER, rootGoal())
 
-        Goal closed = service.update(OWNER, root.id, new Goal(status: GoalStatus.COMPLETED))
+        Goal closed = service.update(OWNER, root.id, new Goal(status: GoalStatusType.COMPLETED))
 
         assert closed.completedDate
     }
@@ -128,7 +128,7 @@ class GoalServiceTest {
         Goal sleep = service.createChild(OWNER, root.id, new Goal(title: "Sleep", startDate: day(30)))
         Goal cardio = service.createChild(OWNER, root.id, new Goal(title: "Cardio", startDate: day(10)))
         service.createChild(OWNER, cardio.id, new Goal(title: "Zone 2"))
-        store.metricService().create(OWNER, root.id, new GoalMetric(name: "Resting heart rate", direction: MetricDirection.DECREASE))
+        store.metricService().create(OWNER, root.id, new GoalMetric(name: "Resting heart rate", direction: MetricDirectionType.DECREASE))
         store.metricService().create(OWNER, sleep.id, new GoalMetric(name: "Sleep quality", type: MetricType.SCALE, scaleMin: 1, scaleMax: 5))
 
         GoalTreeNode tree = service.tree(OWNER, root.id)

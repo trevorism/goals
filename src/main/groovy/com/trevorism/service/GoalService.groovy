@@ -4,8 +4,8 @@ import com.trevorism.model.Goal
 import com.trevorism.model.GoalAdjustment
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
-import com.trevorism.model.GoalStatus
 import com.trevorism.model.GoalTreeNode
+import com.trevorism.model.types.GoalStatusType
 import jakarta.inject.Named
 import jakarta.inject.Singleton
 
@@ -67,7 +67,7 @@ class GoalService {
         existing.startDate = changes.startDate ?: existing.startDate
         existing.endDate = changes.endDate ?: existing.endDate
         existing.definitionOfDone = changes.definitionOfDone ?: existing.definitionOfDone
-        if (existing.status != GoalStatus.ACTIVE && previousStatus == GoalStatus.ACTIVE) {
+        if (existing.status != GoalStatusType.ACTIVE && previousStatus == GoalStatusType.ACTIVE) {
             existing.completedDate = new Date()
         }
         Goal parent = existing.parentId ? goalRepository.get(ownerId, existing.parentId) : null
@@ -122,14 +122,14 @@ class GoalService {
     }
 
     private static void applyCreateDefaults(Goal goal) {
-        goal.status = goal.status ?: GoalStatus.ACTIVE
+        goal.status = goal.status ?: GoalStatusType.ACTIVE
         goal.createdDate = new Date()
-        goal.completedDate = goal.status != GoalStatus.ACTIVE ? new Date() : null
+        goal.completedDate = goal.status != GoalStatusType.ACTIVE ? new Date() : null
     }
 
     private static void validate(Goal goal, Goal parent) {
         require(goal.title?.trim() as boolean, "title is required")
-        requireOneOf(goal.status, GoalStatus.ALL, "status")
+        requireOneOf(goal.status, GoalStatusType.ALL, "status")
         require(goal.endDate.after(goal.startDate), "endDate must be after startDate")
         if (parent) {
             require(!goal.startDate.before(parent.startDate) && !goal.endDate.after(parent.endDate),

@@ -1,6 +1,6 @@
-package com.trevorism.model
+package com.trevorism.model.types
 
-class MetricDirection {
+class MetricDirectionType {
 
     static final String INCREASE = "increase"
     static final String DECREASE = "decrease"

@@ -131,17 +131,19 @@ datastore-client matches them case-insensitively. The tables below use the store
 Every entity is **flat**: fields are strings, numbers, dates and booleans. The only lists are
 `GoalMetric.choices`, which follows prompt's `Choice {value, label}` convention, and
 `GoalAdjustment.metricIds`, a list of strings. Every string indicator is a plain `String` field whose
-allowed values are listed in a values class (constants plus an `ALL` list), checked on create and update:
+allowed values are listed in a values class (constants plus an `ALL` list), checked on create and update.
+Values classes live in `com.trevorism.model.types` and end in `Type`, so they're easy to tell apart
+from stored entities:
 
 | Values class | Field | Values |
 |---|---|---|
-| `GoalStatus` | `Goal.status` | `active` \| `completed` \| `missed` \| `abandoned` |
+| `GoalStatusType` | `Goal.status` | `active` \| `completed` \| `missed` \| `abandoned` |
 | `MetricType` | `GoalMetric.type` | `numeric` \| `boolean` \| `scale` \| `choice` \| `text` |
-| `MetricMeasures` | `GoalMetric.measures` | `outcome` (lag) \| `effort` (lead) |
-| `MetricDirection` | `GoalMetric.direction` | `increase` \| `decrease` \| `maintain` |
-| `Frequency` | `GoalMetric.frequency` | `daily` \| `weekly` \| `monthly` |
-| `MetricSource` | `GoalMetric.source`, `GoalObservation.source` | `manual` \| `prompt` \| `http` \| `event` \| `aggregation` |
-| `AdjustmentCategory` | `GoalAdjustment.category` | `habit` \| `tool` \| `environment` \| `plan` \| `other` |
+| `MetricMeasuresType` | `GoalMetric.measures` | `outcome` (lag) \| `effort` (lead) |
+| `MetricDirectionType` | `GoalMetric.direction` | `increase` \| `decrease` \| `maintain` |
+| `FrequencyType` | `GoalMetric.frequency` | `daily` \| `weekly` \| `monthly` |
+| `MetricSourceType` | `GoalMetric.source`, `GoalObservation.source` | `manual` \| `prompt` \| `http` \| `event` \| `aggregation` |
+| `AdjustmentCategoryType` | `GoalAdjustment.category` | `habit` \| `tool` \| `environment` \| `plan` \| `other` |
 
 ### 4.1 Goal (the tree node)
 | Field | Notes |
@@ -149,7 +151,7 @@ allowed values are listed in a values class (constants plus an `ALL` list), chec
 | id, ownerid | |
 | parentid, rootid | `rootid` is empty on a root and holds the root id on descendants. One filter on `rootid` loads a whole tree. |
 | title, description | |
-| status | `GoalStatus`; `active` by default. Leaving `active` sets `completeddate`. |
+| status | `GoalStatusType`; `active` by default. Leaving `active` sets `completeddate`. |
 | startdate, enddate | Children inherit the parent's dates by default and must fit inside them. |
 | definitionofdone | Optional. Describes when a concrete step counts as done. |
 | createddate, completeddate | |
@@ -166,13 +168,13 @@ allowed values are listed in a values class (constants plus an `ALL` list), chec
 | id, ownerid, goalid, rootid | `rootid` is copied from the goal so a whole tree's metrics load with one filter |
 | name, unit, description | |
 | type | `MetricType`; `numeric` by default; can't change after creation |
-| measures | `MetricMeasures`: whether the metric tracks the result (`outcome`) or the work toward it (`effort`); `outcome` by default |
-| direction | `MetricDirection`; numeric and scale only; `increase` by default |
+| measures | `MetricMeasuresType`: whether the metric tracks the result (`outcome`) or the work toward it (`effort`); `outcome` by default |
+| direction | `MetricDirectionType`; numeric and scale only; `increase` by default |
 | baseline, target, tolerance | For a boolean metric, `target` is the required share of yes answers, e.g. 0.857 (6/7), in (0, 1]. `tolerance` is required for `maintain`. |
 | scalemin, scalemax | scale only |
 | choices | `[{value, label}]`, as in prompt. A missing value is derived from the label (`"Just OK"` → `just-ok`) and made unique. Boolean metrics always get `yes`/`no`. |
-| frequency | `Frequency`; `daily` by default |
-| source | `MetricSource`; `manual` by default |
+| frequency | `FrequencyType`; `daily` by default |
+| source | `MetricSourceType`; `manual` by default |
 | nextdueat, lastcollectedat, enabled | |
 
 ### 4.3 Observation
@@ -184,12 +186,12 @@ allowed values are listed in a values class (constants plus an `ALL` list), chec
 | choice | Boolean and choice metrics: the selected choice's value, matching prompt's `selectedChoices` |
 | label | The selected choice's label, or the text answer |
 | note | |
-| source, sourceref | `MetricSource`, e.g. `prompt` + answerId, `manual` |
+| source, sourceref | `MetricSourceType`, e.g. `prompt` + answerId, `manual` |
 | missed | `true` for a period nobody answered |
 
 ### 4.4 Adjustment
 `id, ownerid, goalid, metricids[] (empty = all metrics in the subtree), effectivedate, title,
-description, category (AdjustmentCategory; other by default)`
+description, category (AdjustmentCategoryType; other by default)`
 
 ### 4.5 PendingAsk
 `id, ownerid, metricid, questionid, periodstart, periodend, status (open|answered|missed|invalid),
@@ -311,7 +313,7 @@ server, so the UI and the emails always agree.
 
 ### 8.1 The automation ladder
 Phase 5 adds flat automation fields to `Goal` (for example `automationlevel`, `automationaction`), with an
-`AutomationLevel` values class.
+`AutomationLevelType` values class.
 
 | Level | Meaning | How it works |
 |---|---|---|

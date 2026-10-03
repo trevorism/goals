@@ -1,13 +1,13 @@
 package com.trevorism.service
 
-import com.trevorism.model.Frequency
 import com.trevorism.model.Goal
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
-import com.trevorism.model.MetricDirection
-import com.trevorism.model.MetricMeasures
-import com.trevorism.model.MetricSource
-import com.trevorism.model.MetricType
+import com.trevorism.model.types.FrequencyType
+import com.trevorism.model.types.MetricDirectionType
+import com.trevorism.model.types.MetricMeasuresType
+import com.trevorism.model.types.MetricSourceType
+import com.trevorism.model.types.MetricType
 import jakarta.inject.Named
 import jakarta.inject.Singleton
 
@@ -43,10 +43,10 @@ class MetricService {
         metric.goalId = goal.id
         metric.rootId = goal.treeRootId()
         metric.type = metric.type ?: MetricType.NUMERIC
-        metric.measures = metric.measures ?: MetricMeasures.OUTCOME
+        metric.measures = metric.measures ?: MetricMeasuresType.OUTCOME
         metric.enabled = metric.enabled != null ? metric.enabled : true
-        metric.frequency = metric.frequency ?: Frequency.DAILY
-        metric.source = metric.source ?: MetricSource.MANUAL
+        metric.frequency = metric.frequency ?: FrequencyType.DAILY
+        metric.source = metric.source ?: MetricSourceType.MANUAL
         metric.choices = choicesFor(metric)
         metric.direction = defaultDirection(metric)
         metric.nextDueAt = metric.nextDueAt ?: new Date()
@@ -95,19 +95,19 @@ class MetricService {
         if (metric.direction) {
             return metric.direction
         }
-        metric.type in [MetricType.NUMERIC, MetricType.SCALE] ? MetricDirection.INCREASE : null
+        metric.type in [MetricType.NUMERIC, MetricType.SCALE] ? MetricDirectionType.INCREASE : null
     }
 
     private static void validate(GoalMetric metric) {
         require(metric.name?.trim() as boolean, "name is required")
         requireOneOf(metric.type, MetricType.ALL, "type")
-        requireOneOf(metric.measures, MetricMeasures.ALL, "measures")
-        requireOneOf(metric.frequency, Frequency.ALL, "frequency")
-        requireOneOf(metric.source, MetricSource.ALL, "source")
+        requireOneOf(metric.measures, MetricMeasuresType.ALL, "measures")
+        requireOneOf(metric.frequency, FrequencyType.ALL, "frequency")
+        requireOneOf(metric.source, MetricSourceType.ALL, "source")
         if (metric.type in [MetricType.NUMERIC, MetricType.SCALE]) {
-            requireOneOf(metric.direction, MetricDirection.ALL, "direction")
+            requireOneOf(metric.direction, MetricDirectionType.ALL, "direction")
         }
-        if (metric.direction == MetricDirection.MAINTAIN) {
+        if (metric.direction == MetricDirectionType.MAINTAIN) {
             require(metric.tolerance != null && metric.tolerance >= 0, "a maintain metric requires a non-negative tolerance")
         }
         if (metric.type == MetricType.SCALE) {

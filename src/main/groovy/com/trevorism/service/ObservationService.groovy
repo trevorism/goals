@@ -3,8 +3,8 @@ package com.trevorism.service
 import com.trevorism.model.Choice
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
-import com.trevorism.model.MetricSource
-import com.trevorism.model.MetricType
+import com.trevorism.model.types.MetricSourceType
+import com.trevorism.model.types.MetricType
 import jakarta.inject.Named
 import jakarta.inject.Singleton
 
@@ -31,7 +31,7 @@ class ObservationService {
         GoalMetric metric = metricRepository.get(ownerId, metricId)
         observation.metricId = metric.id
         observation.observedAt = observation.observedAt ?: new Date()
-        observation.source = observation.source ?: MetricSource.MANUAL
+        observation.source = observation.source ?: MetricSourceType.MANUAL
         observation.missed = observation.missed ?: false
         observation.createdDate = new Date()
         normalizeAgainst(metric, observation)

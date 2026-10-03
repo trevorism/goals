@@ -1,6 +1,6 @@
-package com.trevorism.model
+package com.trevorism.model.types
 
-class Frequency {
+class FrequencyType {
 
     static final String DAILY = "daily"
     static final String WEEKLY = "weekly"

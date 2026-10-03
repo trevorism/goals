@@ -1,9 +1,9 @@
 package com.trevorism.service
 
-import com.trevorism.model.AdjustmentCategory
 import com.trevorism.model.Goal
 import com.trevorism.model.GoalAdjustment
 import com.trevorism.model.GoalMetric
+import com.trevorism.model.types.AdjustmentCategoryType
 import jakarta.inject.Named
 import jakarta.inject.Singleton
 
@@ -35,7 +35,7 @@ class AdjustmentService {
         adjustment.goalId = goal.id
         adjustment.metricIds = adjustment.metricIds ?: []
         adjustment.effectiveDate = adjustment.effectiveDate ?: new Date()
-        adjustment.category = adjustment.category ?: AdjustmentCategory.OTHER
+        adjustment.category = adjustment.category ?: AdjustmentCategoryType.OTHER
         adjustment.createdDate = new Date()
         validate(ownerId, goal, adjustment)
         adjustmentRepository.create(ownerId, adjustment)
@@ -59,7 +59,7 @@ class AdjustmentService {
 
     private void validate(String ownerId, Goal goal, GoalAdjustment adjustment) {
         require(adjustment.title?.trim() as boolean, "title is required")
-        requireOneOf(adjustment.category, AdjustmentCategory.ALL, "category")
+        requireOneOf(adjustment.category, AdjustmentCategoryType.ALL, "category")
         adjustment.metricIds.each { String metricId ->
             GoalMetric metric = metricRepository.get(ownerId, metricId)
             require(metric.rootId == goal.treeRootId(), "metricIds must belong to the same goal tree")

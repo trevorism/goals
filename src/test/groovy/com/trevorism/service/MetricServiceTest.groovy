@@ -1,14 +1,14 @@
 package com.trevorism.service
 
 import com.trevorism.model.Choice
-import com.trevorism.model.Frequency
 import com.trevorism.model.Goal
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
-import com.trevorism.model.MetricDirection
-import com.trevorism.model.MetricMeasures
-import com.trevorism.model.MetricSource
-import com.trevorism.model.MetricType
+import com.trevorism.model.types.FrequencyType
+import com.trevorism.model.types.MetricDirectionType
+import com.trevorism.model.types.MetricMeasuresType
+import com.trevorism.model.types.MetricSourceType
+import com.trevorism.model.types.MetricType
 import com.trevorism.support.TestStore
 import org.junit.jupiter.api.Test
 
@@ -31,11 +31,11 @@ class MetricServiceTest {
         assert metric.goalId == root.id
         assert metric.rootId == root.id
         assert metric.type == MetricType.NUMERIC
-        assert metric.measures == MetricMeasures.OUTCOME
-        assert metric.direction == MetricDirection.INCREASE
+        assert metric.measures == MetricMeasuresType.OUTCOME
+        assert metric.direction == MetricDirectionType.INCREASE
         assert metric.enabled
-        assert metric.frequency == Frequency.DAILY
-        assert metric.source == MetricSource.MANUAL
+        assert metric.frequency == FrequencyType.DAILY
+        assert metric.source == MetricSourceType.MANUAL
         assert metric.choices == []
         assert metric.nextDueAt
     }
@@ -44,11 +44,11 @@ class MetricServiceTest {
     void testMetricOnAChildCarriesTheTreeRoot() {
         Goal child = store.goalService().createChild(OWNER, root.id, new Goal(title: "Sleep"))
 
-        GoalMetric metric = service.create(OWNER, child.id, new GoalMetric(name: "Hours", frequency: Frequency.WEEKLY))
+        GoalMetric metric = service.create(OWNER, child.id, new GoalMetric(name: "Hours", frequency: FrequencyType.WEEKLY))
 
         assert metric.goalId == child.id
         assert metric.rootId == root.id
-        assert metric.frequency == Frequency.WEEKLY
+        assert metric.frequency == FrequencyType.WEEKLY
     }
 
     @Test
@@ -81,7 +81,7 @@ class MetricServiceTest {
         assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", type: MetricType.CHOICE, choices: [new Choice(label: "only")])) }
         assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", type: MetricType.CHOICE, choices: [new Choice(label: "a"), new Choice(label: " ")])) }
         assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", type: MetricType.BOOLEAN, target: 1.5)) }
-        assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", direction: MetricDirection.MAINTAIN)) }
+        assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", direction: MetricDirectionType.MAINTAIN)) }
         assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", frequency: "hourly")) }
         assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", source: "telepathy")) }
     }
@@ -90,12 +90,12 @@ class MetricServiceTest {
     void testUpdateMergesAndRejectsATypeChange() {
         GoalMetric metric = service.create(OWNER, root.id, new GoalMetric(name: "Weight", unit: "lb"))
 
-        GoalMetric updated = service.update(OWNER, metric.id, new GoalMetric(target: 180, baseline: 200, frequency: Frequency.MONTHLY))
+        GoalMetric updated = service.update(OWNER, metric.id, new GoalMetric(target: 180, baseline: 200, frequency: FrequencyType.MONTHLY))
 
         assert updated.name == "Weight"
         assert updated.target == 180d
         assert updated.baseline == 200d
-        assert updated.frequency == Frequency.MONTHLY
+        assert updated.frequency == FrequencyType.MONTHLY
         assertBadRequest { service.update(OWNER, metric.id, new GoalMetric(type: MetricType.TEXT)) }
     }
 
