@@ -3,6 +3,7 @@ package com.trevorism.service
 import com.trevorism.model.Goal
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
+import com.trevorism.model.GoalPendingAsk
 import com.trevorism.model.types.FrequencyType
 import com.trevorism.model.types.MetricDirectionType
 import com.trevorism.model.types.MetricMeasuresType
@@ -20,13 +21,16 @@ class MetricService {
     private final OwnedRepository<Goal> goalRepository
     private final OwnedRepository<GoalMetric> metricRepository
     private final OwnedRepository<GoalObservation> observationRepository
+    private final OwnedRepository<GoalPendingAsk> pendingAskRepository
 
     MetricService(@Named("goal") OwnedRepository<Goal> goalRepository,
                   @Named("metric") OwnedRepository<GoalMetric> metricRepository,
-                  @Named("observation") OwnedRepository<GoalObservation> observationRepository) {
+                  @Named("observation") OwnedRepository<GoalObservation> observationRepository,
+                  @Named("pendingAsk") OwnedRepository<GoalPendingAsk> pendingAskRepository) {
         this.goalRepository = goalRepository
         this.metricRepository = metricRepository
         this.observationRepository = observationRepository
+        this.pendingAskRepository = pendingAskRepository
     }
 
     List<GoalMetric> listForGoal(String ownerId, String goalId) {
@@ -72,6 +76,7 @@ class MetricService {
         existing.choices = changes.choices ?: existing.choices
         existing.frequency = changes.frequency ?: existing.frequency
         existing.source = changes.source ?: existing.source
+        existing.promptText = changes.promptText != null ? changes.promptText.trim() : existing.promptText
         existing.enabled = changes.enabled != null ? changes.enabled : existing.enabled
         existing.choices = choicesFor(existing)
         validate(existing)
@@ -81,6 +86,7 @@ class MetricService {
     GoalMetric delete(String ownerId, String id) {
         GoalMetric metric = metricRepository.get(ownerId, id)
         observationRepository.listWhere(ownerId, "metricId", metric.id).each { observationRepository.delete(ownerId, it.id) }
+        pendingAskRepository.listWhere(ownerId, "metricId", metric.id).each { pendingAskRepository.delete(ownerId, it.id) }
         metricRepository.delete(ownerId, id)
     }
 

@@ -48,6 +48,7 @@ dependencies {
     annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
 
     implementation("io.micronaut.groovy:micronaut-runtime-groovy")
+    implementation("org.apache.groovy:groovy-json")
     implementation("io.micronaut:micronaut-jackson-databind")
     implementation("io.micronaut.security:micronaut-security")
     runtimeOnly("org.yaml:snakeyaml")

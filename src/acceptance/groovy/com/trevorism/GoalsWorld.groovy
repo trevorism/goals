@@ -30,6 +30,8 @@ class GoalsWorld {
     Map progress
     Map numericMetric
     List todayItems
+    Map profile
+    Map eventOutcome
 
     Map createRoot() {
         root = postJson("api/goal", [title: "${MARKER} root goal".toString(), startDate: daysFromToday(-2), endDate: daysFromToday(180)])
@@ -71,6 +73,27 @@ class GoalsWorld {
 
     static String daysFromToday(int days) {
         LocalDate.now(ZoneOffset.UTC).plusDays(days).toString()
+    }
+
+    Map fetchProfile() {
+        profile = getJson("api/profile")
+    }
+
+    Map updateProfile(String timezone) {
+        profile = gson.fromJson(authClient.put("${BASE_URL}/api/profile".toString(), gson.toJson([timezone: timezone])), Map)
+    }
+
+    Map sendAnsweredEvent(Map event) {
+        eventOutcome = postJson("api/event/questionAnswered", event)
+    }
+
+    void attemptAuthenticatedPut(String path, Map body) {
+        try {
+            authClient.put("${BASE_URL}/${path}".toString(), gson.toJson(body))
+            rejected = false
+        } catch (Exception ignored) {
+            rejected = true
+        }
     }
 
     Map fetchProgress() {

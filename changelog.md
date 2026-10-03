@@ -1,3 +1,11 @@
+## 0.6.0
+
+- Metrics can be collected through prompt: choose "Ask me in prompt" and goals sends you one private question per day, week or month, with Yes/No, scale or choice buttons, or a text reply for numbers.
+- Answers are recorded automatically after goals checks them with prompt. Unanswered periods become missed, and unreadable answers are set aside.
+- A daily tick (`POST /api/collect/tick`) asks due questions; `POST /api/collect/provision` sets up the tick and the answer subscription.
+- Your timezone is saved from the browser, so periods and question due times are local.
+- Deleting a goal or metric also removes its open questions.
+
 ## 0.5.0
 
 - Today page: every metric that still needs a value for its current day, week or month, grouped by goal, with one-tap entry. It uses your local date.

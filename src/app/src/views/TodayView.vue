@@ -26,6 +26,7 @@ function describeItem(item) {
   const parts = []
   if (item.goalTitle !== item.rootTitle) parts.push(item.goalTitle)
   parts.push(`due ${periodLabel[item.metric.frequency] ?? 'today'}`)
+  if (item.metric.source === 'prompt') parts.push('also asked in prompt')
   if (item.metric.lastObservedAt) parts.push(`last ${formatDay(item.metric.lastObservedAt)}`)
   return parts.join(' · ')
 }

@@ -1,4 +1,4 @@
-import { MetricDirectionType, MetricType } from './types.js'
+import { MetricDirectionType, MetricSourceType, MetricType } from './types.js'
 
 const pad = (number) => String(number).padStart(2, '0')
 
@@ -62,7 +62,9 @@ export function buildMetricPayload(form) {
     description: blankToNull(form.description?.trim()),
     type: form.type,
     measures: form.measures,
-    frequency: form.frequency
+    frequency: form.frequency,
+    source: form.source,
+    promptText: form.source === MetricSourceType.PROMPT ? form.promptText?.trim() ?? '' : ''
   }
   if (form.type === MetricType.NUMERIC || form.type === MetricType.SCALE) {
     payload.direction = form.direction
@@ -126,6 +128,8 @@ export function metricFormFrom(metric) {
     type: metric?.type ?? MetricType.NUMERIC,
     measures: metric?.measures ?? 'outcome',
     frequency: metric?.frequency ?? 'daily',
+    source: metric?.source ?? MetricSourceType.MANUAL,
+    promptText: metric?.promptText ?? '',
     direction: metric?.direction ?? MetricDirectionType.INCREASE,
     unit: metric?.unit ?? '',
     baseline: metric?.baseline ?? '',

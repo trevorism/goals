@@ -4,11 +4,14 @@ import com.trevorism.model.Goal
 import com.trevorism.model.GoalAdjustment
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
+import com.trevorism.model.GoalPendingAsk
+import com.trevorism.model.GoalProfile
 import com.trevorism.service.AdjustmentService
 import com.trevorism.service.GoalService
 import com.trevorism.service.MetricService
 import com.trevorism.service.ObservationService
 import com.trevorism.service.OwnedRepository
+import com.trevorism.service.ProfileService
 
 class TestStore {
 
@@ -19,22 +22,30 @@ class TestStore {
     final InMemoryRepository<GoalMetric> metrics = new InMemoryRepository<>()
     final InMemoryRepository<GoalObservation> observations = new InMemoryRepository<>()
     final InMemoryRepository<GoalAdjustment> adjustments = new InMemoryRepository<>()
+    final InMemoryRepository<GoalPendingAsk> pendingAsks = new InMemoryRepository<>()
+    final InMemoryRepository<GoalProfile> profiles = new InMemoryRepository<>()
 
     final OwnedRepository<Goal> goalRepository = new OwnedRepository<>(goals, "Goal")
     final OwnedRepository<GoalMetric> metricRepository = new OwnedRepository<>(metrics, "Metric")
     final OwnedRepository<GoalObservation> observationRepository = new OwnedRepository<>(observations, "Observation")
     final OwnedRepository<GoalAdjustment> adjustmentRepository = new OwnedRepository<>(adjustments, "Adjustment")
+    final OwnedRepository<GoalPendingAsk> pendingAskRepository = new OwnedRepository<>(pendingAsks, "Pending ask")
+    final OwnedRepository<GoalProfile> profileRepository = new OwnedRepository<>(profiles, "Profile")
 
     GoalService goalService() {
-        new GoalService(goalRepository, metricRepository, observationRepository, adjustmentRepository)
+        new GoalService(goalRepository, metricRepository, observationRepository, adjustmentRepository, pendingAskRepository)
     }
 
     MetricService metricService() {
-        new MetricService(goalRepository, metricRepository, observationRepository)
+        new MetricService(goalRepository, metricRepository, observationRepository, pendingAskRepository)
     }
 
     ObservationService observationService() {
         new ObservationService(metricRepository, observationRepository)
+    }
+
+    ProfileService profileService() {
+        new ProfileService(profileRepository)
     }
 
     AdjustmentService adjustmentService() {
