@@ -50,7 +50,7 @@ class MetricService {
         metric.choices = choicesFor(metric)
         metric.direction = defaultDirection(metric)
         metric.nextDueAt = metric.nextDueAt ?: new Date()
-        metric.lastCollectedAt = null
+        metric.lastObservedAt = null
         metric.createdDate = new Date()
         validate(metric)
         metricRepository.create(ownerId, metric)

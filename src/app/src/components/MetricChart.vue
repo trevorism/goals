@@ -12,10 +12,11 @@ const props = defineProps({
   goal: { type: Object, required: true },
   observations: { type: Array, default: () => [] },
   metricProgress: { type: Object, default: null },
-  now: { type: [Date, String], default: () => new Date() }
+  now: { type: [Date, String], default: () => new Date() },
+  segments: { type: Array, default: () => [] }
 })
 
-const chart = computed(() => buildMetricChart(props.metric, props.goal, props.observations, props.metricProgress, new Date(props.now)))
+const chart = computed(() => buildMetricChart(props.metric, props.goal, props.observations, props.metricProgress, new Date(props.now), props.segments))
 </script>
 
 <template>

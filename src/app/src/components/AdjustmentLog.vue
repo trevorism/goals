@@ -9,6 +9,8 @@ const props = defineProps({
   metrics: { type: Array, default: () => [] }
 })
 
+const emit = defineEmits(['changed'])
+
 const adjustments = ref([])
 const adding = ref(false)
 const error = ref('')
@@ -41,6 +43,7 @@ async function save() {
     Object.assign(form, blankForm())
     adding.value = false
     await load()
+    emit('changed')
   } catch (e) {
     error.value = errorMessage(e)
   }
@@ -53,6 +56,7 @@ async function remove(adjustment) {
   try {
     await adjustmentsApi.remove(adjustment.id)
     await load()
+    emit('changed')
   } catch (e) {
     error.value = errorMessage(e)
   }

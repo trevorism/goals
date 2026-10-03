@@ -193,4 +193,38 @@ describe('GoalDetail', () => {
 
     expect(axios.get.mock.calls.filter(([url]) => url === '/api/goal/root/progress')).toHaveLength(2)
   })
+
+  it('passes each metric its adjustment segments and reloads progress when adjustments change', async () => {
+    axios.get.mockImplementation((url) => {
+      if (url === '/api/goal/root/tree') return Promise.resolve({ data: tree })
+      if (url === '/api/goal/root/progress') {
+        return Promise.resolve({
+          data: {
+            asOf: '2027-01-15T00:00:00Z',
+            goals: [],
+            metrics: [],
+            segments: [
+              { metricId: 'm1', adjustmentId: null, startDate: '2026-10-01T00:00:00Z', count: 10, adherence: 0.5 },
+              { metricId: 'm1', adjustmentId: 'a1', adjustmentTitle: 'Alarm', startDate: '2026-12-01T00:00:00Z', count: 10, adherence: 0.9 }
+            ]
+          }
+        })
+      }
+      return Promise.resolve({ data: [] })
+    })
+    axios.post.mockResolvedValue({ data: {} })
+    const wrapper = await mountDetail()
+    await wrapper.findAll('.tree-row')[1].trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.adjustment-effect').text()).toBe('50% → 90% yes after “Alarm”')
+
+    await button(wrapper, 'Add adjustment').trigger('click')
+    await wrapper.find('.adjustment-title').setValue('Bought a bike')
+    await button(wrapper, 'Save adjustment').trigger('click')
+    await flushPromises()
+
+    expect(axios.post).toHaveBeenCalledWith('/api/goal/cardio/adjustment', expect.objectContaining({ title: 'Bought a bike' }))
+    expect(axios.get.mock.calls.filter(([url]) => url === '/api/goal/root/progress')).toHaveLength(2)
+  })
 })

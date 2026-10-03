@@ -38,8 +38,10 @@ class ObservationService {
         observation.createdDate = new Date()
         normalizeAgainst(metric, observation)
         GoalObservation created = observationRepository.create(ownerId, observation)
-        metric.lastCollectedAt = new Date()
-        metricRepository.update(ownerId, metric.id, metric)
+        if (metric.lastObservedAt == null || created.observedAt.after(metric.lastObservedAt)) {
+            metric.lastObservedAt = created.observedAt
+            metricRepository.update(ownerId, metric.id, metric)
+        }
         return created
     }
 
@@ -57,11 +59,24 @@ class ObservationService {
         existing.label = changes.label != null && metric.type == MetricType.TEXT ? changes.label : existing.label
         existing.note = changes.note ?: existing.note
         normalizeAgainst(metric, existing)
-        observationRepository.update(ownerId, id, existing)
+        GoalObservation updated = observationRepository.update(ownerId, id, existing)
+        refreshLastObserved(ownerId, metric)
+        return updated
     }
 
     GoalObservation delete(String ownerId, String id) {
-        observationRepository.delete(ownerId, id)
+        GoalObservation existing = observationRepository.get(ownerId, id)
+        GoalObservation deleted = observationRepository.delete(ownerId, id)
+        refreshLastObserved(ownerId, metricRepository.get(ownerId, existing.metricId))
+        return deleted
+    }
+
+    private void refreshLastObserved(String ownerId, GoalMetric metric) {
+        Date latest = observationRepository.listWhere(ownerId, "metricId", metric.id)*.observedAt.findAll().max()
+        if (latest != null && latest != metric.lastObservedAt) {
+            metric.lastObservedAt = latest
+            metricRepository.update(ownerId, metric.id, metric)
+        }
     }
 
     private static void normalizeAgainst(GoalMetric metric, GoalObservation observation) {

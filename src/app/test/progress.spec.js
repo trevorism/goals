@@ -6,6 +6,8 @@ import {
   buildTrendChart,
   describeMetricProgress,
   describeScore,
+  describeSegments,
+  adjustmentMarkers,
   formatPercent,
   periodOf,
   progressById,
@@ -30,7 +32,7 @@ describe('formatting and lookup', () => {
     const maps = progressById({ goals: [{ goalId: 'g' }], metrics: [{ metricId: 'm' }] })
     expect(maps.goals.g).toEqual({ goalId: 'g' })
     expect(maps.metrics.m).toEqual({ metricId: 'm' })
-    expect(progressById(null)).toEqual({ goals: {}, metrics: {} })
+    expect(progressById(null)).toEqual({ goals: {}, metrics: {}, segments: {} })
   })
 
   it('maps a day to its period start', () => {
@@ -169,5 +171,50 @@ describe('score wording', () => {
     expect(decrease.options.plugins.annotation.annotations.target.label.yAdjust).toBe(10)
     expect(increase.options.plugins.annotation.annotations.target.label.yAdjust).toBe(-10)
     expect(decrease.options.scales.y.grace).toBe('10%')
+  })
+})
+
+describe('adjustments', () => {
+  const segments = [
+    { metricId: 'w', adjustmentId: null, startDate: day(0), count: 30, slope: -0.1 },
+    { metricId: 'w', adjustmentId: 'a', adjustmentTitle: 'Started walking after lunch every day', startDate: day(30), count: 20, slope: -0.3 }
+  ]
+
+  it('groups segments by metric', () => {
+    expect(progressById({ segments }).segments.w).toHaveLength(2)
+  })
+
+  it('marks each adjustment on the chart with a shortened label', () => {
+    const markers = adjustmentMarkers(segments)
+
+    expect(Object.keys(markers)).toEqual(['adjustment-a'])
+    expect(markers['adjustment-a'].xMin).toBe(start + 30 * DAY)
+    expect(markers['adjustment-a'].label.content).toBe('Started walking after l…')
+    const chart = buildTrendChart({ type: 'numeric' }, goal, [{ observedAt: day(10), value: 1 }], null, now, segments)
+    expect(chart.options.plugins.annotation.annotations['adjustment-a']).toBeDefined()
+    expect(chart.options.plugins.annotation.annotations.today).toBeDefined()
+  })
+
+  it('compares the weekly rate before and after an adjustment', () => {
+    expect(describeSegments({ type: 'numeric', unit: 'lb' }, segments)).toEqual(['−0.7 → −2.1 lb/wk after “Started walking after lunch every day”'])
+  })
+
+  it('says how much data an adjustment still needs', () => {
+    const early = [segments[0], { ...segments[1], count: 3, slope: null }]
+    expect(describeSegments({ type: 'numeric' }, early)).toEqual(['after “Started walking after lunch every day”: 3 of 5 values so far'])
+    const noBefore = [{ ...segments[0], slope: null }, segments[1]]
+    expect(describeSegments({ type: 'numeric', unit: 'lb' }, noBefore)).toEqual(['−2.1 lb/wk since “Started walking after lunch every day”'])
+  })
+
+  it('compares adherence for yes/no metrics', () => {
+    const habit = [{ adjustmentId: null, adherence: 0.5, count: 10 }, { adjustmentId: 'a', adjustmentTitle: 'Alarm', adherence: 0.9, count: 10 }]
+    expect(describeSegments({ type: 'boolean', frequency: 'daily' }, habit)).toEqual(['50% → 90% yes after “Alarm”'])
+    expect(describeSegments({ type: 'boolean', frequency: 'weekly' }, [habit[0], { ...habit[1], adherence: null, count: 2 }])).toEqual(['after “Alarm”: 2 of 5 weeks so far'])
+    expect(describeSegments({ type: 'numeric' }, [])).toEqual([])
+  })
+
+  it('adds markers to the adherence chart too', () => {
+    const chart = buildAdherenceChart({ type: 'boolean', frequency: 'daily' }, goal, [], now, segments)
+    expect(chart.options.plugins.annotation.annotations['adjustment-a']).toBeDefined()
   })
 })

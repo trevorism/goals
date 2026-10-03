@@ -24,7 +24,7 @@ class GoalMetric implements Owned {
     String frequency
     String source
     Date nextDueAt
-    Date lastCollectedAt
+    Date lastObservedAt
     Boolean enabled
 
     Date createdDate

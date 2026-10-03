@@ -1,10 +1,12 @@
 package com.trevorism.service
 
 import com.trevorism.model.Goal
+import com.trevorism.model.GoalAdjustment
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
 import com.trevorism.model.progress.GoalProgress
 import com.trevorism.model.progress.MetricProgress
+import com.trevorism.model.progress.MetricSegment
 import com.trevorism.model.progress.TreeProgress
 import com.trevorism.model.types.FrequencyType
 import com.trevorism.model.types.GoalStatusType
@@ -28,6 +30,7 @@ class ProgressCalculator {
     static final int ADHERENCE_PERIODS = 4
     static final double DAY_MILLIS = 86_400_000d
     static final double PROJECTION_HORIZON_MULTIPLE = 2d
+    static final int MINIMUM_SEGMENT_POINTS = 5
 
     private final Date now
     private final LocalDate today
@@ -37,7 +40,8 @@ class ProgressCalculator {
         this.today = toLocalDate(now)
     }
 
-    TreeProgress calculate(Goal top, List<Goal> subtree, List<GoalMetric> metrics, Map<String, List<GoalObservation>> observationsByMetric) {
+    TreeProgress calculate(Goal top, List<Goal> subtree, List<GoalMetric> metrics, Map<String, List<GoalObservation>> observationsByMetric,
+                           Map<String, List<GoalAdjustment>> adjustmentsByMetric = [:]) {
         Map<String, Goal> goalsById = subtree.collectEntries { [it.id, it] }
         Map<String, List<Goal>> childrenByParent = subtree.groupBy { it.parentId }
         Map<String, List<GoalMetric>> metricsByGoal = metrics.groupBy { it.goalId }
@@ -49,7 +53,10 @@ class ProgressCalculator {
 
         Map<String, GoalProgress> goalResults = [:]
         goalProgress(top, childrenByParent, metricsByGoal, metricResultsById, goalResults)
-        new TreeProgress(asOf: now, goals: goalResults.values().toList(), metrics: metricResults)
+        List<MetricSegment> segmentResults = metrics.findAll { goalsById.containsKey(it.goalId) }.collectMany { GoalMetric metric ->
+            segments(metric, goalsById[metric.goalId], observationsByMetric[metric.id] ?: [], adjustmentsByMetric[metric.id] ?: [])
+        }
+        new TreeProgress(asOf: now, goals: goalResults.values().toList(), metrics: metricResults, segments: segmentResults)
     }
 
     private GoalProgress goalProgress(Goal goal, Map<String, List<Goal>> childrenByParent, Map<String, List<GoalMetric>> metricsByGoal,
@@ -204,8 +211,7 @@ class ProgressCalculator {
             return
         }
         String frequency = metric.frequency ?: FrequencyType.DAILY
-        Map<LocalDate, Boolean> answers = [:]
-        observations.each { answers[periodOf(toLocalDate(it.observedAt), frequency)] = !it.missed && it.value == 1d }
+        Map<LocalDate, Boolean> answers = answersByPeriod(observations, frequency)
 
         LocalDate current = periodOf(today, frequency)
         LocalDate firstAnswered = answers.keySet().min()
@@ -229,6 +235,69 @@ class ProgressCalculator {
         List<LocalDate> streakPeriods = answers.containsKey(current) ? history : history.dropRight(1)
         result.currentStreak = streakPeriods.reverse().takeWhile { answers[it] }.size()
         result.bestStreak = best
+    }
+
+    List<MetricSegment> segments(GoalMetric metric, Goal goal, List<GoalObservation> allObservations, List<GoalAdjustment> adjustments) {
+        List<GoalAdjustment> boundaries = adjustments
+                .findAll { it.effectiveDate != null && it.effectiveDate.after(goal.startDate) && !it.effectiveDate.after(now) }
+                .sort { it.effectiveDate }
+        if (!boundaries || !(metric.type in [MetricType.NUMERIC, MetricType.SCALE, MetricType.BOOLEAN])) {
+            return []
+        }
+        List<GoalObservation> observations = allObservations.findAll { it.observedAt != null && !it.observedAt.after(now) }
+                .sort { a, b -> a.observedAt <=> b.observedAt ?: a.createdDate <=> b.createdDate }
+        List<Date> starts = [goal.startDate] + boundaries*.effectiveDate
+        List<Date> ends = boundaries*.effectiveDate + [now]
+        (0..<starts.size()).collect { int index ->
+            GoalAdjustment adjustment = index == 0 ? null : boundaries[index - 1]
+            MetricSegment segment = new MetricSegment(metricId: metric.id, adjustmentId: adjustment?.id, adjustmentTitle: adjustment?.title,
+                    startDate: starts[index], endDate: ends[index])
+            boolean last = index == starts.size() - 1
+            if (metric.type == MetricType.BOOLEAN) {
+                measureSegmentAdherence(metric, observations, segment, last)
+            } else {
+                measureSegmentTrend(goal, observations, segment, last)
+            }
+            return segment
+        }
+    }
+
+    private void measureSegmentTrend(Goal goal, List<GoalObservation> observations, MetricSegment segment, boolean last) {
+        List<double[]> points = observations
+                .findAll { !it.missed && it.value != null && inSegment(it.observedAt, segment, last) }
+                .collect { [daysFromStart(goal, it.observedAt), it.value] as double[] }
+        segment.count = points.size()
+        if (points.size() >= MINIMUM_SEGMENT_POINTS) {
+            segment.slope = LinearFit.of(points)?.slope
+        }
+    }
+
+    private void measureSegmentAdherence(GoalMetric metric, List<GoalObservation> observations, MetricSegment segment, boolean last) {
+        String frequency = metric.frequency ?: FrequencyType.DAILY
+        Map<LocalDate, Boolean> answers = answersByPeriod(observations, frequency)
+        if (!answers) {
+            segment.count = 0
+            return
+        }
+        LocalDate current = periodOf(today, frequency)
+        LocalDate from = periodOf(toLocalDate(segment.startDate), frequency)
+        LocalDate to = last ? current : periodOf(toLocalDate(segment.endDate), frequency).minus(1, unitOf(frequency))
+        LocalDate first = [from, answers.keySet().min()].max()
+        List<LocalDate> periods = periodsBetween(first, to, frequency).findAll { it != current || answers.containsKey(current) }
+        segment.count = periods.size()
+        if (periods.size() >= MINIMUM_SEGMENT_POINTS) {
+            segment.adherence = periods.count { answers[it] } / (double) periods.size()
+        }
+    }
+
+    private static boolean inSegment(Date date, MetricSegment segment, boolean last) {
+        !date.before(segment.startDate) && (last ? !date.after(segment.endDate) : date.before(segment.endDate))
+    }
+
+    private static Map<LocalDate, Boolean> answersByPeriod(List<GoalObservation> observations, String frequency) {
+        Map<LocalDate, Boolean> answers = [:]
+        observations.each { answers[periodOf(toLocalDate(it.observedAt), frequency)] = !it.missed && it.value == 1d }
+        return answers
     }
 
     private static int windowPeriods(String frequency) {

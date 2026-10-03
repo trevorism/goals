@@ -1,3 +1,10 @@
+## 0.5.0
+
+- Today page: every metric that still needs a value for its current day, week or month, grouped by goal, with one-tap entry. It uses your local date.
+- Adjustments now show on the charts as labelled markers, and each metric compares before and after: the weekly rate of change for numbers and scales, the share of Yes answers for habits.
+- Progress reloads when you add or delete an adjustment.
+- Metrics remember the date of their latest value (`lastObservedAt`, replacing `lastCollectedAt`). Metrics recorded before this release show as due until their next value.
+
 ## 0.4.0
 
 - Progress: each goal shows its status (ahead, on track, at risk, behind, no data), outcome and effort meters with a marker for where the plan says it should be, and how much of its time has passed. The tree shows each sub-goal's progress.

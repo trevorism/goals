@@ -43,10 +43,84 @@ export function formatPercent(value) {
 }
 
 export function progressById(progress) {
+  const segments = {}
+  ;(progress?.segments ?? []).forEach((segment) => {
+    segments[segment.metricId] = [...(segments[segment.metricId] ?? []), segment]
+  })
   return {
     goals: Object.fromEntries((progress?.goals ?? []).map((goal) => [goal.goalId, goal])),
-    metrics: Object.fromEntries((progress?.metrics ?? []).map((metric) => [metric.metricId, metric]))
+    metrics: Object.fromEntries((progress?.metrics ?? []).map((metric) => [metric.metricId, metric])),
+    segments
   }
+}
+
+const MAX_MARKER_LABEL = 24
+
+function shorten(text) {
+  return text.length > MAX_MARKER_LABEL ? `${text.slice(0, MAX_MARKER_LABEL - 1)}…` : text
+}
+
+export function adjustmentMarkers(segments) {
+  return Object.fromEntries(
+    (segments ?? [])
+      .filter((segment) => segment.adjustmentId)
+      .map((segment) => [
+        `adjustment-${segment.adjustmentId}`,
+        {
+          type: 'line',
+          xMin: time(segment.startDate),
+          xMax: time(segment.startDate),
+          borderColor: chartColors.secondaryInk,
+          borderWidth: 1,
+          label: {
+            display: true,
+            content: shorten(segment.adjustmentTitle ?? 'Adjustment'),
+            position: 'end',
+            color: chartColors.secondaryInk,
+            backgroundColor: 'rgba(255, 255, 255, 0.85)',
+            font: { size: 11 }
+          }
+        }
+      ])
+  )
+}
+
+const MINIMUM_SEGMENT_POINTS = 5
+
+const signed = (value) => {
+  const rounded = Math.abs(value) < 0.05 ? 0 : value
+  return `${rounded > 0 ? '+' : rounded < 0 ? '−' : ''}${Math.abs(rounded).toFixed(1)}`
+}
+
+const periodName = (frequency) => ({ weekly: 'weeks', monthly: 'months' })[frequency] ?? 'days'
+
+export function describeSegments(metric, segments) {
+  const ordered = segments ?? []
+  const facts = []
+  for (let index = 1; index < ordered.length; index++) {
+    const before = ordered[index - 1]
+    const after = ordered[index]
+    const title = `“${after.adjustmentTitle ?? 'Adjustment'}”`
+    if (metric.type === MetricType.BOOLEAN) {
+      if (after.adherence === null || after.adherence === undefined) {
+        facts.push(`after ${title}: ${after.count} of ${MINIMUM_SEGMENT_POINTS} ${periodName(metric.frequency)} so far`)
+      } else if (before.adherence === null || before.adherence === undefined) {
+        facts.push(`${formatPercent(after.adherence)} yes since ${title}`)
+      } else {
+        facts.push(`${formatPercent(before.adherence)} → ${formatPercent(after.adherence)} yes after ${title}`)
+      }
+      continue
+    }
+    const unit = metric.unit ? ` ${metric.unit}` : ''
+    if (after.slope === null || after.slope === undefined) {
+      facts.push(`after ${title}: ${after.count} of ${MINIMUM_SEGMENT_POINTS} values so far`)
+    } else if (before.slope === null || before.slope === undefined) {
+      facts.push(`${signed(after.slope * 7)}${unit}/wk since ${title}`)
+    } else {
+      facts.push(`${signed(before.slope * 7)} → ${signed(after.slope * 7)}${unit}/wk after ${title}`)
+    }
+  }
+  return facts
 }
 
 const time = (value) => new Date(value).getTime()
@@ -188,12 +262,12 @@ export function formatNumber(value) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
 
-export function buildTrendChart(metric, goal, observations, metricProgress, now) {
+export function buildTrendChart(metric, goal, observations, metricProgress, now, segments = []) {
   const points = valuePoints(observations, now)
   const start = time(goal.startDate)
   const end = time(goal.endDate)
   const datasets = [{ label: 'Values', data: points, ...pointStyle(chartColors.values), order: 0 }]
-  const annotations = {}
+  const annotations = adjustmentMarkers(segments)
   const target = planTarget(metric)
 
   if (metric.direction === MetricDirectionType.MAINTAIN) {
@@ -253,9 +327,9 @@ export function buildTrendChart(metric, goal, observations, metricProgress, now)
   return { data: { datasets }, options }
 }
 
-export function buildAdherenceChart(metric, goal, observations, now) {
+export function buildAdherenceChart(metric, goal, observations, now, segments = []) {
   const series = rollingAdherence(metric, goal, observations, now)
-  const annotations = {}
+  const annotations = adjustmentMarkers(segments)
   if (metric.target !== null && metric.target !== undefined) {
     annotations.target = {
       type: 'line',
@@ -280,13 +354,13 @@ export function buildChoiceChart(metric, goal, observations, now) {
   return { data: { datasets }, options }
 }
 
-export function buildMetricChart(metric, goal, observations, metricProgress, now) {
+export function buildMetricChart(metric, goal, observations, metricProgress, now, segments = []) {
   switch (metric.type) {
     case MetricType.NUMERIC:
     case MetricType.SCALE:
-      return buildTrendChart(metric, goal, observations, metricProgress, now)
+      return buildTrendChart(metric, goal, observations, metricProgress, now, segments)
     case MetricType.BOOLEAN:
-      return buildAdherenceChart(metric, goal, observations, now)
+      return buildAdherenceChart(metric, goal, observations, now, segments)
     case MetricType.CHOICE:
       return buildChoiceChart(metric, goal, observations, now)
     default:

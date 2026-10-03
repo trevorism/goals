@@ -37,7 +37,7 @@ class ObservationServiceTest {
         assert observation.observedAt
         assert observation.metricSource == MetricSourceType.MANUAL
         assert !observation.missed
-        assert store.metricRepository.get(OWNER, weight.id).lastCollectedAt
+        assert store.metricRepository.get(OWNER, weight.id).lastObservedAt == observation.observedAt
         assertBadRequest { service.create(OWNER, weight.id, new GoalObservation()) }
         assertBadRequest { service.create(OWNER, weight.id, new GoalObservation(value: 1, metricSource: "rumor")) }
     }
@@ -136,5 +136,20 @@ class ObservationServiceTest {
         assertNotFound { service.listForMetric(OWNER, theirMetric.id) }
         assertNotFound { service.update(OWNER, theirObservation.id, new GoalObservation(value: 2)) }
         assertNotFound { service.delete(OWNER, theirObservation.id) }
+    }
+
+    @Test
+    void testTheMetricTracksItsLatestObservedDayThroughEditsAndDeletes() {
+        GoalMetric weight = metric(type: MetricType.NUMERIC)
+        GoalObservation early = service.create(OWNER, weight.id, new GoalObservation(value: 1, observedAt: day(20)))
+        GoalObservation late = service.create(OWNER, weight.id, new GoalObservation(value: 2, observedAt: day(30)))
+        service.create(OWNER, weight.id, new GoalObservation(value: 3, observedAt: day(25)))
+        assert store.metricRepository.get(OWNER, weight.id).lastObservedAt == day(30)
+
+        service.delete(OWNER, late.id)
+        assert store.metricRepository.get(OWNER, weight.id).lastObservedAt == day(25)
+
+        service.update(OWNER, early.id, new GoalObservation(observedAt: day(40)))
+        assert store.metricRepository.get(OWNER, weight.id).lastObservedAt == day(40)
     }
 }

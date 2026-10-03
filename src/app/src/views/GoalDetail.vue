@@ -236,6 +236,7 @@ onMounted(load)
             :goal="selectedGoal"
             :metric-progress="progressMaps.metrics[metric.id] ?? null"
             :now="progress?.asOf ?? null"
+            :segments="progressMaps.segments[metric.id] ?? []"
             @changed="load"
             @recorded="loadProgress"
           />
@@ -244,7 +245,7 @@ onMounted(load)
           </p>
         </section>
 
-        <adjustment-log :goal-id="selectedGoal.id" :metrics="selectedMetrics" />
+        <adjustment-log :goal-id="selectedGoal.id" :metrics="selectedMetrics" @changed="loadProgress" />
       </div>
     </div>
   </section>

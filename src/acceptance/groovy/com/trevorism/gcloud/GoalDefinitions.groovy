@@ -94,6 +94,38 @@ Then(~/^the progress shows the step's metric meeting its target$/) { ->
     assert rootProgress.outcomeProgress == null
 }
 
+Then(~/^the progress splits the step's metric at the adjustment$/) { ->
+    fetchProgress()
+    List segments = progress.segments.findAll { it.metricId == metric.id }
+    assert segments*.adjustmentId == [null, adjustment.id]
+    assert segments[1].adjustmentTitle == adjustment.title
+}
+
+Given(~/^a daily number metric is added to the root goal$/) { ->
+    createNumericMetricOnRoot()
+}
+
+Then(~/^today lists the metric as due$/) { ->
+    fetchToday()
+    Map item = todayItems.find { it.metric.id == numericMetric.id }
+    assert item
+    assert item.rootId == root.id
+    assert item.goalTitle == root.title
+}
+
+When(~/^a value is recorded for today$/) { ->
+    recordNumericValue()
+}
+
+Then(~/^today no longer lists the metric$/) { ->
+    fetchToday()
+    assert !todayItems.any { it.metric.id == numericMetric.id }
+}
+
+When(~/^I ask what is due on "(.*)"$/) { String date ->
+    attemptAuthenticatedGet("api/today?date=${date}")
+}
+
 Then(~/^the adjustment is attached to the root goal$/) { ->
     assert adjustment.goalId == root.id
     assert adjustment.metricIds == [metric.id]
@@ -115,5 +147,5 @@ When(~/^I request the goal "(.*)"$/) { String id ->
 }
 
 When(~/^I add a child that ends after the root goal$/) { ->
-    attemptAuthenticatedPost("api/goal/${root.id}/child", [title: "too late", endDate: "2027-06-30"])
+    attemptAuthenticatedPost("api/goal/${root.id}/child", [title: "too late", endDate: GoalsWorld.daysFromToday(365)])
 }

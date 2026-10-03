@@ -6,6 +6,9 @@ import com.trevorism.http.JsonHttpClient
 import com.trevorism.https.AppClientSecureHttpClient
 import com.trevorism.https.SecureHttpClient
 
+import java.time.LocalDate
+import java.time.ZoneOffset
+
 class GoalsWorld {
 
     static final String BASE_URL = System.getenv("ACCEPTANCE_BASE_URL") ?: "https://goals.action.trevorism.com"
@@ -25,9 +28,11 @@ class GoalsWorld {
     Map adjustment
     Map tree
     Map progress
+    Map numericMetric
+    List todayItems
 
     Map createRoot() {
-        root = postJson("api/goal", [title: "${MARKER} root goal".toString(), startDate: "2026-10-01", endDate: "2027-03-31"])
+        root = postJson("api/goal", [title: "${MARKER} root goal".toString(), startDate: daysFromToday(-2), endDate: daysFromToday(180)])
         createdRootIds << (root.id as String)
         return root
     }
@@ -46,6 +51,26 @@ class GoalsWorld {
 
     Map recordAdjustment() {
         adjustment = postJson("api/goal/${root.id}/adjustment", [title: "${MARKER} changed a habit".toString(), category: "habit", metricIds: [metric.id]])
+    }
+
+    Map createNumericMetricOnRoot() {
+        numericMetric = postJson("api/goal/${root.id}/metric", [name: "${MARKER} weight".toString(), unit: "lb", frequency: "daily"])
+    }
+
+    Map recordNumericValue() {
+        postJson("api/metric/${numericMetric.id}/observation", [value: 180, observedAt: today()])
+    }
+
+    List fetchToday() {
+        todayItems = gson.fromJson(authClient.get("${BASE_URL}/api/today?date=${today()}".toString()), List)
+    }
+
+    static String today() {
+        daysFromToday(0)
+    }
+
+    static String daysFromToday(int days) {
+        LocalDate.now(ZoneOffset.UTC).plusDays(days).toString()
     }
 
     Map fetchProgress() {

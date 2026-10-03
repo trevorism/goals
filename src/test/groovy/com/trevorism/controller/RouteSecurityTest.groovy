@@ -14,7 +14,7 @@ import java.lang.reflect.Method
 class RouteSecurityTest {
 
     private static final List<Class> ROUTE_ANNOTATIONS = [Get, Post, Put, Patch, Delete]
-    private static final List<Class> SECURED_CONTROLLERS = [GoalController, MetricController, ObservationController, AdjustmentController]
+    private static final List<Class> SECURED_CONTROLLERS = [GoalController, MetricController, ObservationController, AdjustmentController, TodayController]
 
     @Test
     void testEveryGoalDataRouteRequiresAUser() {
@@ -22,7 +22,7 @@ class RouteSecurityTest {
             controller.declaredMethods.findAll { Method method -> ROUTE_ANNOTATIONS.any { method.isAnnotationPresent(it) } }
         }
 
-        assert routes.size() == 21
+        assert routes.size() == 22
         routes.each { Method route ->
             Secure secure = route.getAnnotation(Secure)
             assert secure, "${route.declaringClass.simpleName}.${route.name} has no @Secure"
