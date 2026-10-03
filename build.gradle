@@ -61,10 +61,15 @@ dependencies {
 
     implementation 'com.trevorism:micronaut-utility-beans:2.1.1'
     implementation 'com.trevorism:micronaut-ui-auth:1.1.0'
+    implementation ('com.trevorism:datastore-client:4.2.1'){
+        exclude module:"slf4j-nop"
+    }
     runtimeOnly("ch.qos.logback:logback-classic")
 
     testImplementation 'com.trevorism:test-result-events:0.3.0'
     acceptanceImplementation 'io.cucumber:cucumber-groovy:6.10.4'
+    acceptanceImplementation 'com.trevorism:secure-http-utils:3.3.0'
+    acceptanceImplementation 'com.google.code.gson:gson:2.14.0'
 }
 
 application {
