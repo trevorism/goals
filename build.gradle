@@ -126,6 +126,8 @@ tasks.register('installNodeDependencies', NpmTask) {
 
 tasks.register('buildApp', NpmTask) {
     dependsOn('installNodeDependencies')
+    inputs.dir("src/app/src")
+    inputs.files("src/app/index.html", "src/app/package.json", "src/app/vite.config.js", "src/app/vuestic.config.js")
     outputs.dir("src/app/dist")
     group = "npm"
     args = ['run', 'build']

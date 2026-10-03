@@ -24,6 +24,7 @@ class GoalsWorld {
     Map observation
     Map adjustment
     Map tree
+    Map progress
 
     Map createRoot() {
         root = postJson("api/goal", [title: "${MARKER} root goal".toString(), startDate: "2026-10-01", endDate: "2027-03-31"])
@@ -45,6 +46,10 @@ class GoalsWorld {
 
     Map recordAdjustment() {
         adjustment = postJson("api/goal/${root.id}/adjustment", [title: "${MARKER} changed a habit".toString(), category: "habit", metricIds: [metric.id]])
+    }
+
+    Map fetchProgress() {
+        progress = getJson("api/goal/${root.id}/progress")
     }
 
     Map fetchTree() {

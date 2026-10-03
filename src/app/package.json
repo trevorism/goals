@@ -18,8 +18,11 @@
     "@tailwindcss/vite": "^4.3.3",
     "@trevorism/ui-auth": "^1.2.0",
     "@trevorism/ui-header-bar": "^6.1.0",
-    "vue": "^3.5.43",
     "axios": "^1.20.0",
+    "chart.js": "^4.5.1",
+    "chartjs-plugin-annotation": "^3.1.0",
+    "vue": "^3.5.43",
+    "vue-chartjs": "^5.3.4",
     "vue-router": "^5.3.1",
     "vue3-click-away": "^1.2.4",
     "vuestic-ui": "^1.10.3"

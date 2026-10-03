@@ -18,6 +18,7 @@ Feature: Goal trees
     And an adjustment targeting the metric is recorded
     Then the tree shows the step with its metric
     And the observation is labelled "Yes"
+    And the progress shows the step's metric meeting its target
     And the adjustment is attached to the root goal
     When the root goal is deleted
     Then the step and its metric are gone

@@ -213,28 +213,39 @@ requestsummary, resultsummary, error`
 ## 5. Measurement types and scoring
 
 Every observation is stored as `value` plus `label`, so one pipeline handles all metric types. Each
-scored metric produces a **progress score p ∈ [0, 1]**.
+scored metric produces a **progress score p ∈ [0, 1]**. `ProgressCalculator` computes it on the server.
 
 | Type | Collected as | Score p | Chart |
 |---|---|---|---|
-| numeric | number | `clamp((current − baseline) / (target − baseline))`, where `current` is the fitted value at the latest observation. For `maintain`, the share of the last N observations within `tolerance`. | Scatter, best fit, plan line, target band |
-| boolean | Yes/No choices → 1/0 | `min(adherence / target, 1)` over a rolling window (default 4 periods). Missed periods count as 0. | Calendar heatmap, rolling adherence line, current and best streak |
-| scale | choices `scalemin..scalemax` | Rolling mean, normalized between baseline and target | Line with best fit |
-| choice | choices, ordered worst to best | Rolling mean of position ÷ (choices − 1) | Stacked frequency per period |
-| text | free text | Not scored | Journal timeline under the chart |
+| numeric | number | `clamp((current − baseline) / (target − baseline))`. `current` is the fitted value at the latest observation (the latest value when there are fewer than 3). A missing baseline uses the first value; no target means no score. For `maintain`, the share of the last 7 values within `tolerance` of the target. | Values, trend fit, plan line, target line or tolerance band |
+| boolean | Yes/No → 1/0 | `min(adherence / target, 1)`, or adherence when there's no target. Adherence is the share of periods answered Yes over the last 28 days (daily) or 4 periods (weekly, monthly), counted from the first answer. Unanswered past periods count as No; an unanswered current period doesn't count yet. The latest answer in a period wins. | Rolling adherence line with a target line; current and best streak |
+| scale | scale points | Mean of the last 7 values, normalized between baseline and target (defaulting to the scale's ends) | Values, trend fit, plan line, target line |
+| choice | choices, ordered worst to best | Mean of position ÷ (choices − 1) over the last 7 answers | Answers on a worst→best axis |
+| text | free text | Not scored | None; the journal list under the card |
+
+Missed observations and observations dated in the future are ignored, except that a missed yes/no period
+counts as No.
+
+### Expected progress
+- **Progress metrics** (numeric and scale that increase or decrease) follow a linear plan:
+  `expected(t) = clamp((t − start) / (end − start))`, using the metric's goal dates.
+- **Steady metrics** (yes/no, choice, and `maintain`) should be at target the whole time, so
+  `expected = 1`.
+- **Pace** = `p − expected`. **Ahead** when pace > 0.05, **on track** within ±0.05, **behind** below
+  that. **No data** when there's no score.
+- **At risk:** a metric that is ahead or on track, but whose trend projects below 0.9 of the way to
+  its target at the end date.
 
 ### Rollup
-- **Effort progress:** the mean of the children's progress. A concrete step counts as 1 when it is
-  `completed`; otherwise it uses its effort metrics, or 0 if it has none.
-- **Outcome progress:** the mean of the node's own outcome metrics.
-- Each node shows both numbers. A node's headline number is its outcome progress if it has outcome
-  metrics, otherwise its effort progress.
-
-### Status against the plan
-- The plan is linear: `expected(t) = (t − start) / (end − start)`.
-- **On track:** `p` is within ±0.05 of `expected`. **Ahead:** above that band. **Behind:** below it.
-- For numeric and scale metrics, the projection is the best-fit value at `enddate`.
-  **At risk:** the projected p at the end date is below 0.9.
+- **Outcome progress:** the mean score of the goal's own outcome metrics.
+- **Effort progress:** the mean of the goal's own effort metric scores and its sub-goals' progress.
+  A completed sub-goal counts as 1, an abandoned one is left out, and an unmeasured one counts as 0.
+- **Headline:** outcome when the goal has scored outcome metrics, otherwise effort. A goal's
+  progress and pace are the means over its headline items, so its status follows the same pace bands.
+  A goal is at risk when it would otherwise be ahead or on track but one of its headline items is at
+  risk. A completed goal is 100%.
+- The UI shows both meters, with a marker on the headline meter at `progress − pace`: where the plan
+  says the goal should be by now.
 
 ## 6. Collection
 
@@ -282,32 +293,41 @@ scored metric produces a **progress score p ∈ [0, 1]**.
 
 ## 7. Analysis
 
-`GET /api/goal/{id}/progress` returns everything the chart and the emails need. It is computed on the
-server, so the UI and the emails always agree.
+`GET /api/goal/{id}/progress` computes progress for the goal's whole subtree in one call, so the UI
+and the emails always agree. The response is two flat lists:
 
 ```
-{ goal, effortprogress, outcomeprogress, status, children:[{id,title,progress,status}],
-  metrics:[{ metric, observations, plan:{start,end,baseline,target},
-             fit:{slope,intercept,r2,n,projectedend,projectedtargetdate},
-             segments:[{from,to,adjustmentid,slope,n}], adherence?, streak?, score, status }],
-  adjustments }
+{ asof,
+  goals:   [{ goalid, parentid, progress, outcomeprogress, effortprogress, expected, pace, status }],
+  metrics: [{ metricid, goalid, score, expected, status, current, observationcount,
+              fitslope, fitintercept, fitr2, fitcount, projectedend, projectedprogress,
+              projectedtargetdate, adherence, currentstreak, beststreak }] }
 ```
 
-- **Fit:** ordinary least squares of value against days since start. It needs at least 3 observations
-  and reports `r2` and `n`. Boolean metrics are fitted on rolling adherence rather than raw 0/1
-  values. `projectedtargetdate` solves the fit line for `target`, and is empty if the line never
-  reaches it before twice the remaining time.
-- **Segmented fit:** the observations are split at each adjustment that applies to the metric. Each
-  segment with at least 5 points gets its own slope. The UI labels the slope change, e.g. "−0.2 →
-  −0.6 lb/wk after *Started walking daily*", and states that it shows correlation, not causation.
-- **Chart (chart.js):**
-  - The x axis is fixed from `startdate` to `enddate`, with a "today" marker.
-  - Plan: a dashed line from baseline to target. Target: a horizontal band.
-  - Observations are points. Missed observations are hollow markers.
-  - The fit is a solid line through the data, then dashed to the end date.
-  - Adjustments are vertical annotation lines with labels.
-  - Boolean metrics get a calendar heatmap and a rolling adherence line instead.
-  - Load the `dataviz` skill before writing any chart code.
+`status` values come from `ProgressStatusType`: `ahead`, `on_track`, `at_risk`, `behind`, `no_data`.
+
+- **Fit:** ordinary least squares of value against days since the goal's start date, for numeric and
+  scale metrics with at least 3 values. `fitintercept` is the value at the start date and `fitslope`
+  the change per day. `projectedend` is the fit at the end date, capped to the scale's range for scale
+  metrics. `projectedtargetdate` solves the fit for the target, and is empty when the target is already
+  reached, the trend moves away from it, or it lies beyond twice the remaining time.
+- **Segmented fit (phase 1d):** the observations are split at each adjustment that applies to the
+  metric. Each segment with at least 5 points gets its own slope. The UI labels the slope change, e.g.
+  "−0.2 → −0.6 lb/wk after *Started walking daily*", and states that it shows correlation, not
+  causation.
+- **Charts (chart.js + chartjs-plugin-annotation):**
+  - The x axis is fixed from the goal's start to its end date, with a "Today" marker.
+  - Values are blue points (categorical slot 1). The trend fit is orange (slot 2): solid over the
+    data, dashed to the end date. The plan is a dashed gray line from baseline to target, and the
+    target is a gray hairline, or a shaded band for `maintain`. Dashes mean "plan" or "projection".
+  - Yes/no metrics show the rolling adherence line, computed in the UI with the same window as the
+    server, against a target line.
+  - Choice metrics show answers on a worst→best axis.
+  - Status is always an icon plus a label, never color alone. Each value stays readable in the list
+    under the chart, not only in tooltips.
+  - Adjustments become vertical markers in phase 1d.
+  - The app is light-only, so there's no dark palette yet. Load the `dataviz` skill before changing
+    any chart.
 
 ## 8. Automation
 
@@ -409,7 +429,7 @@ service list.
 | `GET /goal/{id}/tree` | The whole subtree with progress summaries |
 | `POST /goal/{id}/child` | Add a child |
 | `PUT /goal/{id}/move` | Change the parent or the sort order |
-| `GET /goal/{id}/progress` | Analysis (section 7) |
+| `GET /goal/{id}/progress` | Progress, status and trend fits for the whole subtree (section 7) |
 | `GET/POST /goal/{id}/metric`, `GET/PUT/DELETE /metric/{id}` | Metrics |
 | `GET/POST /metric/{id}/observation`, `PUT/DELETE /observation/{id}` | Observations |
 | `GET/POST /goal/{id}/adjustment`, `PUT/DELETE /adjustment/{id}` | Adjustments |
