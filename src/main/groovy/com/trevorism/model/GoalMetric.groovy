@@ -17,7 +17,6 @@ class GoalMetric implements Owned {
     Double baseline
     Double target
     Double tolerance
-    Double targetRate
     Double scaleMin
     Double scaleMax
     List<Choice> choices = []

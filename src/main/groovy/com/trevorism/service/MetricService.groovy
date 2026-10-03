@@ -67,7 +67,6 @@ class MetricService {
         existing.baseline = changes.baseline != null ? changes.baseline : existing.baseline
         existing.target = changes.target != null ? changes.target : existing.target
         existing.tolerance = changes.tolerance != null ? changes.tolerance : existing.tolerance
-        existing.targetRate = changes.targetRate != null ? changes.targetRate : existing.targetRate
         existing.scaleMin = changes.scaleMin != null ? changes.scaleMin : existing.scaleMin
         existing.scaleMax = changes.scaleMax != null ? changes.scaleMax : existing.scaleMax
         existing.choices = changes.choices ?: existing.choices
@@ -115,8 +114,8 @@ class MetricService {
             require(metric.scaleMin != null && metric.scaleMax != null && metric.scaleMin < metric.scaleMax,
                     "a scale metric requires scaleMin < scaleMax")
         }
-        if (metric.type == MetricType.BOOLEAN && metric.targetRate != null) {
-            require(metric.targetRate > 0 && metric.targetRate <= 1, "targetRate must be in (0, 1]")
+        if (metric.type == MetricType.BOOLEAN && metric.target != null) {
+            require(metric.target > 0 && metric.target <= 1, "a boolean metric's target is the share of yes answers, in (0, 1]")
         }
         if (metric.type == MetricType.CHOICE) {
             MetricChoices.validate(metric.choices)

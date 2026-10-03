@@ -36,7 +36,7 @@ class GoalsWorld {
     }
 
     Map createBooleanMetricOnChild() {
-        metric = postJson("api/goal/${child.id}/metric", [name: "${MARKER} did it".toString(), type: "boolean", targetRate: 0.8])
+        metric = postJson("api/goal/${child.id}/metric", [name: "${MARKER} did it".toString(), type: "boolean", target: 0.8])
     }
 
     Map recordYes() {

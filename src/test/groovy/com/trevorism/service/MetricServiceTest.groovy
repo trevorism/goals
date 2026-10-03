@@ -53,12 +53,13 @@ class MetricServiceTest {
 
     @Test
     void testBooleanMetricsGetYesAndNoChoices() {
-        GoalMetric metric = service.create(OWNER, root.id, new GoalMetric(name: "Walked", type: MetricType.BOOLEAN, targetRate: 0.857,
+        GoalMetric metric = service.create(OWNER, root.id, new GoalMetric(name: "Walked", type: MetricType.BOOLEAN, target: 0.857,
                 choices: [new Choice(label: "Maybe")]))
 
         assert metric.choices*.value == ["yes", "no"]
         assert metric.choices*.label == ["Yes", "No"]
         assert metric.direction == null
+        assert metric.target == 0.857d
     }
 
     @Test
@@ -79,7 +80,7 @@ class MetricServiceTest {
         assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", type: MetricType.SCALE, scaleMin: 5, scaleMax: 1)) }
         assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", type: MetricType.CHOICE, choices: [new Choice(label: "only")])) }
         assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", type: MetricType.CHOICE, choices: [new Choice(label: "a"), new Choice(label: " ")])) }
-        assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", type: MetricType.BOOLEAN, targetRate: 1.5)) }
+        assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", type: MetricType.BOOLEAN, target: 1.5)) }
         assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", direction: MetricDirection.MAINTAIN)) }
         assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", frequency: "hourly")) }
         assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", source: "telepathy")) }

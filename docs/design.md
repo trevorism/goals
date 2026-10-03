@@ -168,8 +168,7 @@ allowed values are listed in a values class (constants plus an `ALL` list), chec
 | type | `MetricType`; `numeric` by default; can't change after creation |
 | role | `MetricRole`; `outcome` by default |
 | direction | `MetricDirection`; numeric and scale only; `increase` by default |
-| baseline, target, tolerance | `tolerance` is required for `maintain` |
-| targetrate | boolean: required share of yes answers, e.g. 0.857 (6/7) |
+| baseline, target, tolerance | For a boolean metric, `target` is the required share of yes answers, e.g. 0.857 (6/7), in (0, 1]. `tolerance` is required for `maintain`. |
 | scalemin, scalemax | scale only |
 | choices | `[{value, label}]`, as in prompt. A missing value is derived from the label (`"Just OK"` → `just-ok`) and made unique. Boolean metrics always get `yes`/`no`. |
 | frequency | `Frequency`; `daily` by default |
@@ -217,7 +216,7 @@ scored metric produces a **progress score p ∈ [0, 1]**.
 | Type | Collected as | Score p | Chart |
 |---|---|---|---|
 | numeric | number | `clamp((current − baseline) / (target − baseline))`, where `current` is the fitted value at the latest observation. For `maintain`, the share of the last N observations within `tolerance`. | Scatter, best fit, plan line, target band |
-| boolean | Yes/No choices → 1/0 | `min(adherence / targetrate, 1)` over a rolling window (default 4 periods). Missed periods count as 0. | Calendar heatmap, rolling adherence line, current and best streak |
+| boolean | Yes/No choices → 1/0 | `min(adherence / target, 1)` over a rolling window (default 4 periods). Missed periods count as 0. | Calendar heatmap, rolling adherence line, current and best streak |
 | scale | choices `scalemin..scalemax` | Rolling mean, normalized between baseline and target | Line with best fit |
 | choice | choices, ordered worst to best | Rolling mean of position ÷ (choices − 1) | Stacked frequency per period |
 | text | free text | Not scored | Journal timeline under the chart |
