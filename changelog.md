@@ -1,3 +1,10 @@
+## 0.3.0
+
+- Goals UI: a goal list, a goal page with a collapsible tree of sub-goals, editing, status changes (complete, abandon, reopen) and delete.
+- Metrics UI: add and edit metrics of all five types, and record values with a control for each type (number, Yes/No, scale points, choices, text), with an optional date and note.
+- Adjustments UI: log behavior changes on a goal and link them to metrics.
+- The goal tree response always includes its metrics and children lists, even when they're empty.
+
 ## 0.2.0
 
 - Goal trees: create root goals, add sub-goals and steps, and load a whole subtree with its metrics.

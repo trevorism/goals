@@ -64,6 +64,7 @@ Then(~/^the tree shows the step with its metric$/) { ->
     assert step.goal.definitionOfDone == "Done when acceptance passes"
     assert step.goal.rootId == root.id
     assert step.metrics*.id == [metric.id]
+    assert step.children == []
     assert step.metrics[0].choices*.value == ["yes", "no"]
     assert step.metrics[0].frequency == "daily"
     assert step.metrics[0].source == "manual"

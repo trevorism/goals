@@ -67,6 +67,7 @@ dependencies {
     runtimeOnly("ch.qos.logback:logback-classic")
 
     testImplementation 'com.trevorism:test-result-events:0.3.0'
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind'
     acceptanceImplementation 'io.cucumber:cucumber-groovy:6.10.4'
     acceptanceImplementation 'com.trevorism:secure-http-utils:3.3.0'
     acceptanceImplementation 'com.google.code.gson:gson:2.14.0'
