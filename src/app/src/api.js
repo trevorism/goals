@@ -31,6 +31,10 @@ export const adjustmentsApi = {
   remove: (id) => data(axios.delete(`/api/adjustment/${id}`))
 }
 
+export const todayApi = {
+  due: (date) => data(axios.get('/api/today', { params: { date } }))
+}
+
 export function errorMessage(error) {
   return error?.response?.data?.message || error?.response?.data?._embedded?.errors?.[0]?.message || error?.message || 'Request failed'
 }

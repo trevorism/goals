@@ -20,6 +20,7 @@ Feature: Goal trees
     And the observation is labelled "Yes"
     And the progress shows the step's metric meeting its target
     And the adjustment is attached to the root goal
+    And the progress splits the step's metric at the adjustment
     When the root goal is deleted
     Then the step and its metric are gone
 

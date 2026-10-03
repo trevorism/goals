@@ -1,6 +1,7 @@
 package com.trevorism.service
 
 import com.trevorism.model.Goal
+import com.trevorism.model.GoalAdjustment
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
 import com.trevorism.model.progress.TreeProgress
@@ -19,7 +20,7 @@ import static com.trevorism.support.TestStore.rootGoal
 class ProgressServiceTest {
 
     private final TestStore store = new TestStore()
-    private final ProgressService service = new ProgressService(store.goalRepository, store.metricRepository, store.observationRepository)
+    private final ProgressService service = new ProgressService(store.goalRepository, store.metricRepository, store.observationRepository, store.adjustmentRepository)
 
     ProgressServiceTest() {
         service.clock = Clock.fixed(day(183).toInstant(), ZoneOffset.UTC)
@@ -47,5 +48,21 @@ class ProgressServiceTest {
         Goal theirs = store.goalService().createRoot(OTHER_OWNER, rootGoal())
 
         assertNotFound { service.progress(OWNER, theirs.id) }
+    }
+
+    @Test
+    void testAnAncestorsAdjustmentSplitsASubGoalsMetric() {
+        Goal root = store.goalService().createRoot(OWNER, rootGoal())
+        Goal cardio = store.goalService().createChild(OWNER, root.id, new Goal(title: "Cardio"))
+        GoalMetric weight = store.metricService().create(OWNER, cardio.id, new GoalMetric(name: "Weight"))
+        (1..20).each { store.observationService().create(OWNER, weight.id, new GoalObservation(value: 200 - it, observedAt: day(it * 5))) }
+        store.adjustmentService().create(OWNER, root.id, new GoalAdjustment(title: "Cut sugar", effectiveDate: day(50)))
+        Goal theirs = store.goalService().createRoot(OTHER_OWNER, rootGoal())
+        store.adjustmentService().create(OTHER_OWNER, theirs.id, new GoalAdjustment(title: "Not mine", effectiveDate: day(60)))
+
+        TreeProgress progress = service.progress(OWNER, cardio.id)
+
+        assert progress.segments*.adjustmentTitle == [null, "Cut sugar"]
+        assert progress.segments*.count == [9, 11]
     }
 }

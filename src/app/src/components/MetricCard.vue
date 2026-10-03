@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { errorMessage, metricsApi, observationsApi } from '../api.js'
 import { describeObservation, describeTarget, formatDay } from '../forms.js'
-import { describeMetricProgress, describeScore } from '../progress.js'
+import { describeMetricProgress, describeScore, describeSegments } from '../progress.js'
 import { metricTypeLabels } from '../types.js'
 import MetricChart from './MetricChart.vue'
 import MetricForm from './MetricForm.vue'
@@ -15,7 +15,8 @@ const props = defineProps({
   metric: { type: Object, required: true },
   goal: { type: Object, required: true },
   metricProgress: { type: Object, default: null },
-  now: { type: [Date, String], default: null }
+  now: { type: [Date, String], default: null },
+  segments: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits(['changed', 'recorded'])
@@ -29,6 +30,7 @@ const recent = computed(() => [...observations.value].reverse().slice(0, RECENT_
 const target = computed(() => describeTarget(props.metric))
 const facts = computed(() => describeMetricProgress(props.metric, props.metricProgress))
 const chartNow = computed(() => props.now ?? new Date())
+const adjustmentFacts = computed(() => describeSegments(props.metric, props.segments))
 
 async function loadObservations() {
   try {
@@ -114,7 +116,11 @@ onMounted(loadObservations)
           <span v-if="metricProgress.score != null" class="metric-score text-slate-700">{{ describeScore(metric, metricProgress.score) }}</span>
           <span v-for="fact in facts" :key="fact" class="metric-fact text-slate-500">· {{ fact }}</span>
         </div>
-        <metric-chart :metric="metric" :goal="goal" :observations="observations" :metric-progress="metricProgress" :now="chartNow" />
+        <metric-chart :metric="metric" :goal="goal" :observations="observations" :metric-progress="metricProgress" :now="chartNow" :segments="segments" />
+        <div v-if="adjustmentFacts.length" class="adjustment-effects flex flex-col gap-1 text-sm">
+          <span v-for="fact in adjustmentFacts" :key="fact" class="adjustment-effect text-slate-700">{{ fact }}</span>
+          <span class="text-xs text-slate-500">Changes after an adjustment show correlation, not causation.</span>
+        </div>
         <observation-entry :metric="metric" :saving="saving" @record="record" />
         <p v-if="error" class="card-error text-sm text-red-600">{{ error }}</p>
         <ul v-if="recent.length" class="recent flex flex-col gap-1 text-sm">

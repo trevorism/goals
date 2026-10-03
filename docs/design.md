@@ -175,7 +175,7 @@ from stored entities:
 | choices | `[{value, label}]`, as in prompt. A missing value is derived from the label (`"Just OK"` → `just-ok`) and made unique. Boolean metrics always get `yes`/`no`. |
 | frequency | `FrequencyType`; `daily` by default |
 | source | `MetricSourceType`; `manual` by default |
-| nextdueat, lastcollectedat, enabled | |
+| nextdueat, lastobservedat, enabled | `lastobservedat` is the date of the most recent observation, kept up to date when values are recorded, edited or deleted. The Today view uses it to find what's due without querying observations. Datastore can't clear a field, so deleting every observation leaves the last date in place. |
 
 ### 4.3 Observation
 | Field | Notes |
@@ -301,7 +301,8 @@ and the emails always agree. The response is two flat lists:
   goals:   [{ goalid, parentid, progress, outcomeprogress, effortprogress, expected, pace, status }],
   metrics: [{ metricid, goalid, score, expected, status, current, observationcount,
               fitslope, fitintercept, fitr2, fitcount, projectedend, projectedprogress,
-              projectedtargetdate, adherence, currentstreak, beststreak }] }
+              projectedtargetdate, adherence, currentstreak, beststreak }],
+  segments: [{ metricid, adjustmentid, adjustmenttitle, startdate, enddate, count, slope, adherence }] }
 ```
 
 `status` values come from `ProgressStatusType`: `ahead`, `on_track`, `at_risk`, `behind`, `no_data`.
@@ -311,10 +312,14 @@ and the emails always agree. The response is two flat lists:
   the change per day. `projectedend` is the fit at the end date, capped to the scale's range for scale
   metrics. `projectedtargetdate` solves the fit for the target, and is empty when the target is already
   reached, the trend moves away from it, or it lies beyond twice the remaining time.
-- **Segmented fit (phase 1d):** the observations are split at each adjustment that applies to the
-  metric. Each segment with at least 5 points gets its own slope. The UI labels the slope change, e.g.
-  "−0.2 → −0.6 lb/wk after *Started walking daily*", and states that it shows correlation, not
-  causation.
+- **Segments:** a metric's history is split at each adjustment that applies to it and falls after the
+  goal's start and up to now. An adjustment applies to the metrics it lists, or, when it lists none,
+  to every metric on its goal and the goal's sub-goals. The first segment has no adjustment. A number
+  or scale segment with at least 5 values gets its own slope; a yes/no segment with at least 5 periods
+  gets its own adherence (unanswered past periods count as No). Choice and text metrics aren't
+  segmented. The UI compares neighbouring segments, e.g. "−0.4 → −0.5 lb/wk after “Cut evening
+  snacks”" or "70% → 90% yes after “Walk right after lunch”", says how much data a new segment still
+  needs, and notes that this shows correlation, not causation.
 - **Charts (chart.js + chartjs-plugin-annotation):**
   - The x axis is fixed from the goal's start to its end date, with a "Today" marker.
   - Values are blue points (categorical slot 1). The trend fit is orange (slot 2): solid over the
@@ -325,7 +330,8 @@ and the emails always agree. The response is two flat lists:
   - Choice metrics show answers on a worst→best axis.
   - Status is always an icon plus a label, never color alone. Each value stays readable in the list
     under the chart, not only in tooltips.
-  - Adjustments become vertical markers in phase 1d.
+  - Each adjustment is a thin solid vertical marker labelled with its title (shortened to 24
+    characters).
   - The app is light-only, so there's no dark palette yet. Load the `dataviz` skill before changing
     any chart.
 
@@ -436,7 +442,7 @@ service list.
 | `POST /goal/{id}/decompose` | Propose children (section 11.3); persists nothing |
 | `POST /goal/{id}/decompose/accept` | Create the accepted children |
 | `PUT /goal/{id}/automation`, `GET /goal/{id}/automation/run` | Automation settings and run log |
-| `GET /today` | What's due, missed, invalid or awaiting approval for the current user |
+| `GET /today?date=yyyy-MM-dd` | Metrics with nothing recorded in their current day, week or month, for the caller's local date (phase 1: manual metrics only; missed, invalid and approvals come in phases 2 and 5) |
 | `GET/PUT /profile` | Email, timezone and digest settings |
 | `POST /collect/tick` | SYSTEM |
 | `POST /event/questionAnswered`, `/event/questionOverdue`, `/event/approvalDecided`, `/event/topic/{topic}` | Event receivers |

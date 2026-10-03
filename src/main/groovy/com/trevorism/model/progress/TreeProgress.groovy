@@ -8,4 +8,5 @@ class TreeProgress {
     Date asOf
     List<GoalProgress> goals = []
     List<MetricProgress> metrics = []
+    List<MetricSegment> segments = []
 }
