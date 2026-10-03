@@ -44,6 +44,11 @@ export const AdjustmentCategoryType = {
   ALL: ['habit', 'tool', 'environment', 'plan', 'other']
 }
 
+export const MetricSourceType = {
+  MANUAL: 'manual',
+  PROMPT: 'prompt'
+}
+
 export const metricTypeLabels = {
   numeric: 'Number',
   boolean: 'Yes / No',

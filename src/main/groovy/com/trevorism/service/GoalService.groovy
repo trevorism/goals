@@ -4,6 +4,7 @@ import com.trevorism.model.Goal
 import com.trevorism.model.GoalAdjustment
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
+import com.trevorism.model.GoalPendingAsk
 import com.trevorism.model.GoalTreeNode
 import com.trevorism.model.types.GoalStatusType
 import jakarta.inject.Named
@@ -19,15 +20,18 @@ class GoalService {
     private final OwnedRepository<GoalMetric> metricRepository
     private final OwnedRepository<GoalObservation> observationRepository
     private final OwnedRepository<GoalAdjustment> adjustmentRepository
+    private final OwnedRepository<GoalPendingAsk> pendingAskRepository
 
     GoalService(@Named("goal") OwnedRepository<Goal> goalRepository,
                 @Named("metric") OwnedRepository<GoalMetric> metricRepository,
                 @Named("observation") OwnedRepository<GoalObservation> observationRepository,
-                @Named("adjustment") OwnedRepository<GoalAdjustment> adjustmentRepository) {
+                @Named("adjustment") OwnedRepository<GoalAdjustment> adjustmentRepository,
+                @Named("pendingAsk") OwnedRepository<GoalPendingAsk> pendingAskRepository) {
         this.goalRepository = goalRepository
         this.metricRepository = metricRepository
         this.observationRepository = observationRepository
         this.adjustmentRepository = adjustmentRepository
+        this.pendingAskRepository = pendingAskRepository
     }
 
     List<Goal> listRoots(String ownerId) {
@@ -107,6 +111,7 @@ class GoalService {
     private void deleteNodeAndData(String ownerId, Goal goal) {
         metricRepository.listWhere(ownerId, "goalId", goal.id).each { GoalMetric metric ->
             observationRepository.listWhere(ownerId, "metricId", metric.id).each { observationRepository.delete(ownerId, it.id) }
+            pendingAskRepository.listWhere(ownerId, "metricId", metric.id).each { pendingAskRepository.delete(ownerId, it.id) }
             metricRepository.delete(ownerId, metric.id)
         }
         adjustmentRepository.listWhere(ownerId, "goalId", goal.id).each { adjustmentRepository.delete(ownerId, it.id) }

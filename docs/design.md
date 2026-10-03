@@ -250,46 +250,63 @@ counts as No.
 ## 6. Collection
 
 ### 6.1 Daily tick
-- A schedule task named `goals_daily_tick` runs daily at 05:13 UTC. It sends `POST /api/collect/tick`,
-  which is secured with `@Secure(value = Roles.SYSTEM, allowInternal = true)`.
-- The tick does the following, idempotently (re-running it is safe):
-  1. For each enabled metric with `nextdueat <= now`, run its source (6.2), then move `nextdueat` to
-     the next period in the metric's timezone.
-  2. Mark any `PendingAsk` past `periodend` and still `open` as `missed`, and record a `missed`
-     observation.
-  3. Run any automations that are due (section 8).
-  4. Send notifications that are due (section 10).
-- The schedule service only offers `immediate`, `hourly`, `daily` and `weekly`. One daily tick
-  computing what's due supports weekly, monthly and every-N-days frequencies without creating one
-  task per metric.
-- Times of day are rounded to the daily tick. That is acceptable for long-term goals.
+- The schedule task `goals_daily_tick` runs daily at 11:07 UTC (about 7am US Eastern) and sends
+  `POST /api/collect/tick`, secured with `@Secure(value = Roles.SYSTEM, allowInternal = true)`. Schedule
+  calls back with an internal token.
+- The tick is idempotent; running it twice in a period does nothing new. It:
+  1. Marks every open `GoalPendingAsk` whose period has ended as `missed`, and records a missed
+     observation for its period (`metricsource = prompt`, `sourceref` = the question id).
+  2. For every enabled metric with `source = prompt` whose goal and ancestors are active and whose
+     goal dates include today, asks one question for the current period in the owner's timezone. It
+     skips the metric when a question was already asked for that period, or a value is already
+     recorded for it (from `lastobservedat`).
+  3. Returns counts: `asked`, `alreadyRecorded`, `missed`, `failed`. A failure on one metric doesn't
+     stop the others.
+- One daily tick supports daily, weekly and monthly metrics without a schedule task per metric. A
+  question goes out at the first tick of its period: daily questions at 11:07 UTC, weekly ones on
+  Monday, monthly ones on the 1st.
+- **Provisioning:** `POST /api/collect/provision` (`Roles.SYSTEM`) creates the `goals_daily_tick`
+  schedule task and the `goals-question-answered` subscription if they don't exist. It's run once
+  against production with goals' app credentials. PR environments are never provisioned, because
+  they share production's datastore and a second subscription would double-deliver answers.
 
 ### 6.2 Sources
 | Source | Behavior |
 |---|---|
-| `manual` | Does nothing. The UI shows a "due" badge, and the Today view (section 11) lists it. |
-| `prompt` | Creates a prompt question: `targetIdentityId = owner`, `dueDate = periodend`, `choices` derived from the metric type (Yes/No, scale points, or the choice labels), `text = config.question` or a generated question. Saves a `PendingAsk`. |
-| `http` | Reads data from a **catalogued Trevorism service** (section 8.3) with goals' app token. Extracts a value with `config.path` and an optional reducer (`count`, `sum`, `distinct:<field>`, `latest`). |
-| `aggregation` | `POST data /aggregation` with a stored request, then extracts the result value. |
-| `event` | Push-based. Goals subscribes once per topic. `POST /api/event/topic/{topic}` routes the event to every metric whose `config.topic` matches, extracting `config.valuepath`. A `config.match` map can filter events. |
+| `manual` | Does nothing. The metric shows on the Today page until a value is recorded. |
+| `prompt` | The tick asks a private question in prompt (see 6.3). The metric also shows on Today, so it can be entered by hand; whichever value arrives first wins. |
+| `http`, `event`, `aggregation` | Phase 5. |
 
 ### 6.3 Prompt integration
-- At startup, goals idempotently subscribes `questionAnswered` → `POST /api/event/questionAnswered`,
-  `questionOverdue` → `/api/event/questionOverdue` and `approvalDecided` → `/api/event/approvalDecided`.
-  It uses `ChannelClient.createSubscription`, the same way prompt creates its topics.
-- Event receivers use `@Secure(value = Roles.USER, allowInternal = true)`, because event forwards the
-  publisher's token.
-- **The event payload is never trusted.** `POST /event/{topic}` is unsecured, so anyone can publish.
-  When an answer event arrives:
-  1. Look up the `PendingAsk` by `questionId`. Ignore the event if there's no match or the ask isn't
-     `open`.
-  2. Fetch the answer from prompt with goals' token (`GET /api/answer/{answerId}`), and check that the
-     answer's `questionId` and answerer match.
-  3. Parse the answer: selected choices for boolean, scale and choice; a number from the text for
-     numeric. Record the observation, or mark the ask `invalid` and show it in the Today view.
-- **Prompt change (phase 2, a PR to `prompt`):** add `answerType: text|number`, `unit`, `min` and `max`
-  to Question, so the prompt UI shows a numeric input and validates it. Boolean, scale and choice
-  metrics already work with prompt's existing `choices`, so no change is needed for them.
+- **Question:** `targetIdentityId` = the owner, `privateQuestion = true` (only goals and the owner can
+  see it), `kind = question`, `dueDate` = the end of the period in the owner's timezone.
+  - Choices: yes/no and choice metrics use their own choice values. Scale metrics offer each point
+    (`"1"`..`"5"`). Numeric and text metrics take a free-text answer.
+  - Text: the metric's `prompttext`, or "Goal title: metric name (unit)", then the period ("Sat,
+    Oct 3", "week of Oct 5", "October 2026"). Numeric questions add "Reply with a number."
+  - The question is tracked by a `GoalPendingAsk`: `metricid`, `questionid`, `answerid`,
+    `periodstart`, `periodend`, `status` (`PendingAskStatusType`: `open`, `answered`, `missed`,
+    `invalid`), `note`.
+- **Answers:** prompt publishes `questionAnswered`, and the `goals-question-answered` subscription
+  pushes it to `POST /api/event/questionAnswered`. That route takes
+  `@Secure(value = Roles.USER, allowInternal = true)`, because the push forwards the answering user's
+  token.
+  - **The event body is never trusted.** Goals uses only its `questionId` and `answerId`. It ignores
+    the event unless an open ask has that question, then reads the answer from prompt with its own
+    token. It records nothing unless that answer belongs to the question and was written by the
+    ask's owner.
+  - Choice answers use the selected choice. Scale answers use the selected point. Numeric answers use
+    the first number in the text ("about 1,204.5" → 1204.5). Text answers use the text.
+  - The value is dated to the start of the asked period. If the period already has a value, the ask
+    is closed as answered and nothing is added. Unreadable answers, or values the metric rejects,
+    close the ask as `invalid` with a note.
+  - The route always answers 200 for events it ignores, so Pub/Sub doesn't retry them.
+    `questionOverdue` isn't subscribed; the tick's expiry handles missed periods.
+- **Prompt change (phase 2b, a PR to `prompt`):** add `answerType: text|number`, `unit`, `min` and
+  `max` to Question, so the prompt UI shows a numeric input. Free-text parsing works until then.
+- **Profile:** `GoalProfile` (`ownerid`, `timezone`) holds the owner's IANA timezone. The UI saves the
+  browser's timezone once per session when it differs, through `PUT /api/profile`. Email and digest
+  settings join it in phase 4.
 
 ## 7. Analysis
 
@@ -443,8 +460,9 @@ service list.
 | `POST /goal/{id}/decompose/accept` | Create the accepted children |
 | `PUT /goal/{id}/automation`, `GET /goal/{id}/automation/run` | Automation settings and run log |
 | `GET /today?date=yyyy-MM-dd` | Metrics with nothing recorded in their current day, week or month, for the caller's local date (phase 1: manual metrics only; missed, invalid and approvals come in phases 2 and 5) |
-| `GET/PUT /profile` | Email, timezone and digest settings |
-| `POST /collect/tick` | SYSTEM |
+| `POST /collect/tick` | Daily tick (SYSTEM or internal) |
+| `POST /collect/provision` | Create the tick schedule and answer subscription (SYSTEM) |
+| `GET/PUT /profile` | The owner's timezone (email and digest settings in phase 4) |
 | `POST /event/questionAnswered`, `/event/questionOverdue`, `/event/approvalDecided`, `/event/topic/{topic}` | Event receivers |
 
 ### 11.2 UI screens
@@ -515,17 +533,23 @@ tests in its PR environment.
 - A weekly reflection written by Claude.
 - Goal templates.
 
-## 13. Things to check during implementation
+## 13. Things checked during implementation
 
-1. Can goals' app token create a prompt question targeted at a user, and does it appear in that
-   user's prompt lists? The question's asker will be goals' app identity.
-2. Can goals' app token read the answer (`GET /api/answer/{id}`) and approval decisions?
-3. Does `GET /user/me` return `email`?
-4. Which model names does `chat` accept, e.g. `claude-sonnet-5-5`?
-5. Does goals' app identity have permission to create event subscriptions? The subscription route
-   allows the USER role or internal tokens.
-6. Which tenant does datastore use for entities written with goals' app credentials? Confirm that
-   `ownerid` filtering is the only ownership boundary we rely on.
+Checked 2026-10-03 against the code and the live services:
+
+1. **Goals' app token:** role `system`, no permissions claim, not admin. Routes marked
+   `@Secure(Roles.USER)` accept any role except `internal`, and permission letters are enforced only
+   when the token has a permissions claim. So goals can call every USER and SYSTEM route below.
+2. **Prompt:** goals can create a private question targeted at a user (it shows in the user's pending
+   list), and as the asker it can read the answers. Prompt publishes events with the pass-through
+   client, so `questionAnswered` carries the answering user's token.
+3. **Event:** `POST /subscription` accepts USER. **Schedule:** `POST /api/schedule` accepts USER.
+   **Email:** `POST /mail` accepts USER or internal tokens.
+4. **Auth:** `GET /user/me` needs a user token with the `R` permission, so phase 4 reads the email
+   through the signed-in user's session rather than goals' token.
+5. Tokens are HS512 with a shared signing key, so the local `signingKey` must never leave the machine.
+6. A composite index (equality plus inequality) doesn't exist in datastore, so queries stay
+   equality-only and filter further in memory (section 4, `lastobservedat`).
 
 ## 14. Risks
 

@@ -1,6 +1,21 @@
 <script setup>
+import { watch } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 import { MenuBar } from '@trevorism/ui-header-bar'
+import { useAuth } from '@trevorism/ui-auth'
+import { syncTimezone } from './api.js'
+
+const { isAuthenticated } = useAuth()
+
+watch(
+  isAuthenticated,
+  (authenticated) => {
+    if (authenticated) {
+      syncTimezone().catch(() => {})
+    }
+  },
+  { immediate: true }
+)
 </script>
 
 <template>

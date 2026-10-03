@@ -17,6 +17,39 @@ When(~/^I GET "(.*)" anonymously$/) { String path ->
     anonGet(path)
 }
 
+When(~/^I POST "(.*)" anonymously$/) { String path ->
+    anonPost(path, [:])
+}
+
+When(~/^I read my profile$/) { ->
+    fetchProfile()
+}
+
+Then(~/^the profile has a timezone$/) { ->
+    assert profile.timezone
+}
+
+When(~/^I set my timezone to "(.*)"$/) { String timezone ->
+    updateProfile(timezone)
+}
+
+Then(~/^my timezone is "(.*)"$/) { String timezone ->
+    assert profile.timezone == timezone
+    assert fetchProfile().timezone == timezone
+}
+
+When(~/^I try to set my timezone to "(.*)"$/) { String timezone ->
+    attemptAuthenticatedPut("api/profile", [timezone: timezone])
+}
+
+When(~/^an answered event arrives for a question goals never asked$/) { ->
+    sendAnsweredEvent([questionId: "1", answerId: "2", answerText: "spoofed"])
+}
+
+Then(~/^the event is ignored$/) { ->
+    assert eventOutcome.outcome == "ignored"
+}
+
 When(~/^I create a goal anonymously$/) { ->
     anonPost("api/goal", [title: "anonymous", startDate: "2026-10-01", endDate: "2027-03-31"])
 }

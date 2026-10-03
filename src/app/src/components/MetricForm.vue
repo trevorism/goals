@@ -1,7 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { buildMetricPayload, metricFormFrom, validateMetric } from '../forms.js'
-import { FrequencyType, MetricDirectionType, MetricMeasuresType, MetricType, metricTypeLabels } from '../types.js'
+import { FrequencyType, MetricDirectionType, MetricMeasuresType, MetricSourceType, MetricType, metricTypeLabels } from '../types.js'
 
 const props = defineProps({
   metric: { type: Object, default: null },
@@ -18,6 +18,11 @@ const typeOptions = MetricType.ALL.map((value) => ({ value, text: metricTypeLabe
 const measuresOptions = [
   { value: MetricMeasuresType.OUTCOME, text: 'Outcome — the result you want' },
   { value: MetricMeasuresType.EFFORT, text: 'Effort — the work toward it' }
+]
+
+const sourceOptions = [
+  { value: MetricSourceType.MANUAL, text: 'I enter it myself' },
+  { value: MetricSourceType.PROMPT, text: 'Ask me in prompt' }
 ]
 
 const hasDirection = computed(() => form.type === MetricType.NUMERIC || form.type === MetricType.SCALE)
@@ -55,6 +60,11 @@ function submit() {
     <div class="flex flex-wrap gap-3">
       <va-select v-model="form.measures" label="Measures" :options="measuresOptions" value-by="value" text-by="text" />
       <va-select v-model="form.frequency" label="Frequency" :options="FrequencyType.ALL" />
+      <va-select v-model="form.source" class="metric-source" label="Collected by" :options="sourceOptions" value-by="value" text-by="text" />
+    </div>
+    <div v-if="form.source === 'prompt'" class="prompt-settings flex flex-col gap-1">
+      <va-input v-model="form.promptText" class="prompt-text" label="Question (optional)" placeholder="Leave empty to ask “Goal: metric name”" />
+      <span class="text-xs text-slate-500">A private question is sent to you in prompt once per {{ form.frequency === 'daily' ? 'day' : form.frequency === 'weekly' ? 'week' : 'month' }}. Your answer is recorded here.</span>
     </div>
 
     <div v-if="hasDirection" class="flex flex-wrap gap-3">

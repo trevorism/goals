@@ -14,21 +14,42 @@ import java.lang.reflect.Method
 class RouteSecurityTest {
 
     private static final List<Class> ROUTE_ANNOTATIONS = [Get, Post, Put, Patch, Delete]
-    private static final List<Class> SECURED_CONTROLLERS = [GoalController, MetricController, ObservationController, AdjustmentController, TodayController]
+    private static final List<Class> USER_CONTROLLERS = [GoalController, MetricController, ObservationController, AdjustmentController, TodayController, ProfileController]
+
+    private static List<Method> routesOf(Class controller) {
+        controller.declaredMethods.findAll { Method method -> ROUTE_ANNOTATIONS.any { method.isAnnotationPresent(it) } }
+    }
 
     @Test
-    void testEveryGoalDataRouteRequiresAUser() {
-        List<Method> routes = SECURED_CONTROLLERS.collectMany { Class controller ->
-            controller.declaredMethods.findAll { Method method -> ROUTE_ANNOTATIONS.any { method.isAnnotationPresent(it) } }
-        }
+    void testEveryUserDataRouteRequiresAUserAndRejectsInternalTokens() {
+        List<Method> routes = USER_CONTROLLERS.collectMany { routesOf(it) }
 
-        assert routes.size() == 22
+        assert routes.size() == 24
         routes.each { Method route ->
             Secure secure = route.getAnnotation(Secure)
             assert secure, "${route.declaringClass.simpleName}.${route.name} has no @Secure"
             assert secure.value() == Roles.USER
             assert !secure.allowInternal()
         }
+    }
+
+    @Test
+    void testCollectionRoutesRequireTheSystemRole() {
+        Map<String, Secure> secured = routesOf(CollectionController).collectEntries { [it.name, it.getAnnotation(Secure)] }
+
+        assert secured.keySet() == ["tick", "provision"] as Set
+        assert secured.tick.value() == Roles.SYSTEM && secured.tick.allowInternal()
+        assert secured.provision.value() == Roles.SYSTEM && !secured.provision.allowInternal()
+    }
+
+    @Test
+    void testTheEventReceiverAcceptsTheForwardedPublisherToken() {
+        List<Method> routes = routesOf(EventReceiverController)
+
+        assert routes*.name == ["questionAnswered"]
+        Secure secure = routes[0].getAnnotation(Secure)
+        assert secure.value() == Roles.USER
+        assert secure.allowInternal()
     }
 
     @Test

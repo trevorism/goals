@@ -31,6 +31,26 @@ export const adjustmentsApi = {
   remove: (id) => data(axios.delete(`/api/adjustment/${id}`))
 }
 
+export const profileApi = {
+  get: () => data(axios.get('/api/profile')),
+  update: (profile) => data(axios.put('/api/profile', profile))
+}
+
+const TIMEZONE_SYNCED = 'goals.timezoneSynced'
+
+export async function syncTimezone(storage = window.sessionStorage) {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  if (!timezone || storage.getItem(TIMEZONE_SYNCED) === timezone) {
+    return false
+  }
+  const profile = await profileApi.get()
+  if (profile.timezone !== timezone) {
+    await profileApi.update({ timezone })
+  }
+  storage.setItem(TIMEZONE_SYNCED, timezone)
+  return true
+}
+
 export const todayApi = {
   due: (date) => data(axios.get('/api/today', { params: { date } }))
 }

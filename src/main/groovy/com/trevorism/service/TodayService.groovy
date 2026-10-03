@@ -18,6 +18,8 @@ import static com.trevorism.service.Validation.require
 @Singleton
 class TodayService {
 
+    static final List<String> ANSWERABLE_SOURCES = [MetricSourceType.MANUAL, MetricSourceType.PROMPT]
+
     private final OwnedRepository<Goal> goalRepository
     private final OwnedRepository<GoalMetric> metricRepository
 
@@ -31,7 +33,7 @@ class TodayService {
         LocalDate today = parseDay(date)
         Map<String, Goal> goalsById = goalRepository.list(ownerId).collectEntries { [it.id, it] }
         metricRepository.list(ownerId)
-                .findAll { it.enabled != false && (it.source ?: MetricSourceType.MANUAL) == MetricSourceType.MANUAL }
+                .findAll { it.enabled != false && (it.source ?: MetricSourceType.MANUAL) in ANSWERABLE_SOURCES }
                 .findAll { GoalMetric metric -> isOpen(goalsById[metric.goalId], goalsById, today) && isDue(metric, today) }
                 .collect { GoalMetric metric -> toItem(metric, goalsById, today) }
                 .sort { a, b -> a.rootTitle <=> b.rootTitle ?: a.goalTitle <=> b.goalTitle ?: a.metric.name <=> b.metric.name }

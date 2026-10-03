@@ -109,7 +109,7 @@ onMounted(loadObservations)
       <metric-form v-if="editing" :metric="metric" :saving="saving" @save="save" @cancel="editing = false" />
       <template v-else>
         <p class="metric-summary text-sm text-slate-500">
-          {{ metric.frequency }}<span v-if="target"> · target {{ target }}</span>
+          {{ metric.frequency }}<span v-if="metric.source === 'prompt'" class="asked-in-prompt"> · asked in prompt</span><span v-if="target"> · target {{ target }}</span>
         </p>
         <div v-if="metricProgress && metric.type !== 'text'" class="metric-progress flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
           <progress-status :status="metricProgress.status" />

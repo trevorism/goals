@@ -46,6 +46,15 @@ describe('MetricForm', () => {
     expect(wrapper.emitted('save')[0][0].choices).toEqual([{ label: 'Poor' }, { label: 'Good' }, { label: 'Great' }])
   })
 
+  it('shows the question field only when prompt collects the metric', () => {
+    expect(mountForm().find('.prompt-text').exists()).toBe(false)
+
+    const asked = mountForm({ metric: { id: 'm', name: 'Walked', type: 'boolean', source: 'prompt', promptText: 'Did you walk?', frequency: 'weekly' } })
+
+    expect(asked.find('.prompt-text').element.value).toBe('Did you walk?')
+    expect(asked.find('.prompt-settings').text()).toContain('once per week')
+  })
+
   it('shows validation errors instead of emitting', async () => {
     const wrapper = mountForm()
 
