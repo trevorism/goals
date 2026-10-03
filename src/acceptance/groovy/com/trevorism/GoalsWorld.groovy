@@ -32,7 +32,7 @@ class GoalsWorld {
     }
 
     Map createChildStep() {
-        child = postJson("api/goal/${root.id}/child", [title: "${MARKER} step", kind: "step", definitionOfDone: "Done when acceptance passes"])
+        child = postJson("api/goal/${root.id}/child", [title: "${MARKER} step".toString(), kind: "step", definitionOfDone: "Done when acceptance passes"])
     }
 
     Map createBooleanMetricOnChild() {
