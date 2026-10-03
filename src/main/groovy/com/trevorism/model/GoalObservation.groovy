@@ -8,6 +8,7 @@ class GoalObservation implements Owned {
 
     Date observedAt
     Double value
+    String choice
     String label
     String note
     String source

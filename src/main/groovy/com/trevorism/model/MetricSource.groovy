@@ -7,8 +7,5 @@ class MetricSource {
     static final String HTTP = "http"
     static final String EVENT = "event"
     static final String AGGREGATION = "aggregation"
-    static final List<String> TYPES = [MANUAL, PROMPT, HTTP, EVENT, AGGREGATION]
-
-    String type
-    Map<String, String> config
+    static final List<String> ALL = [MANUAL, PROMPT, HTTP, EVENT, AGGREGATION]
 }

@@ -1,13 +1,13 @@
 package com.trevorism.service
 
-import com.trevorism.model.Automation
 import com.trevorism.model.Goal
 import com.trevorism.model.GoalAdjustment
-import com.trevorism.model.GoalKind
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
 import com.trevorism.model.GoalStatus
 import com.trevorism.model.GoalTreeNode
+import com.trevorism.model.MetricDirection
+import com.trevorism.model.MetricType
 import com.trevorism.support.TestStore
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.exceptions.HttpStatusException
@@ -31,22 +31,18 @@ class GoalServiceTest {
         assert root.ownerId == OWNER
         assert root.parentId == null
         assert root.rootId == null
-        assert root.depth == 0
-        assert root.kind == GoalKind.OUTCOME
         assert root.status == GoalStatus.ACTIVE
-        assert root.weight == 1d
-        assert root.automation.level == Automation.MANUAL
+        assert root.completedDate == null
         assert root.createdDate
         assert root.treeRootId() == root.id
     }
 
     @Test
     void testCreateRootIgnoresClientSuppliedTreePosition() {
-        Goal root = service.createRoot(OWNER, new Goal(title: "t", startDate: day(1), endDate: day(2), parentId: "x", rootId: "y", depth: 4))
+        Goal root = service.createRoot(OWNER, new Goal(title: "t", startDate: day(1), endDate: day(2), parentId: "x", rootId: "y"))
 
         assert root.parentId == null
         assert root.rootId == null
-        assert root.depth == 0
     }
 
     @Test
@@ -54,38 +50,23 @@ class GoalServiceTest {
         assertBadRequest { service.createRoot(OWNER, new Goal(title: " ", startDate: day(1), endDate: day(2))) }
         assertBadRequest { service.createRoot(OWNER, new Goal(title: "t", startDate: day(1))) }
         assertBadRequest { service.createRoot(OWNER, new Goal(title: "t", startDate: day(5), endDate: day(5))) }
-        assertBadRequest { service.createRoot(OWNER, new Goal(title: "t", startDate: day(1), endDate: day(2), kind: "wish")) }
-        assertBadRequest { service.createRoot(OWNER, new Goal(title: "t", startDate: day(1), endDate: day(2), weight: 0)) }
-        assertBadRequest { service.createRoot(OWNER, new Goal(title: "t", startDate: day(1), endDate: day(2), automation: new Automation(level: "magic"))) }
+        assertBadRequest { service.createRoot(OWNER, new Goal(title: "t", startDate: day(1), endDate: day(2), status: "someday")) }
     }
 
     @Test
     void testCreateChildInheritsTreePositionAndDates() {
         Goal root = service.createRoot(OWNER, rootGoal())
         Goal milestone = service.createChild(OWNER, root.id, new Goal(title: "Cardio base"))
-        Goal step = service.createChild(OWNER, milestone.id, new Goal(title: "Walk 30 minutes", kind: GoalKind.STEP,
+        Goal step = service.createChild(OWNER, milestone.id, new Goal(title: "Walk 30 minutes",
                 definitionOfDone: "Walked 30 minutes", startDate: day(10), endDate: day(17)))
 
         assert milestone.parentId == root.id
         assert milestone.rootId == root.id
-        assert milestone.depth == 1
-        assert milestone.kind == GoalKind.MILESTONE
         assert milestone.startDate == root.startDate
         assert milestone.endDate == root.endDate
         assert step.parentId == milestone.id
         assert step.rootId == root.id
-        assert step.depth == 2
-    }
-
-    @Test
-    void testChildrenAreOrderedInCreationOrderByDefault() {
-        Goal root = service.createRoot(OWNER, rootGoal())
-
-        Goal first = service.createChild(OWNER, root.id, new Goal(title: "first"))
-        Goal second = service.createChild(OWNER, root.id, new Goal(title: "second"))
-
-        assert first.sortOrder == 0
-        assert second.sortOrder == 1
+        assert step.definitionOfDone == "Walked 30 minutes"
     }
 
     @Test
@@ -93,13 +74,6 @@ class GoalServiceTest {
         Goal root = service.createRoot(OWNER, rootGoal())
 
         assertBadRequest { service.createChild(OWNER, root.id, new Goal(title: "late", endDate: new Date(day(365).time + 86_400_000L))) }
-    }
-
-    @Test
-    void testAStepRequiresADefinitionOfDone() {
-        Goal root = service.createRoot(OWNER, rootGoal())
-
-        assertBadRequest { service.createChild(OWNER, root.id, new Goal(title: "vague", kind: GoalKind.STEP)) }
     }
 
     @Test
@@ -123,39 +97,39 @@ class GoalServiceTest {
         Goal root = service.createRoot(OWNER, rootGoal())
         Goal child = service.createChild(OWNER, root.id, new Goal(title: "before", description: "kept"))
 
-        Goal updated = service.update(OWNER, child.id, new Goal(title: "after", parentId: "elsewhere", rootId: "elsewhere", depth: 9))
+        Goal updated = service.update(OWNER, child.id, new Goal(title: "after", parentId: "elsewhere", rootId: "elsewhere"))
 
         assert updated.title == "after"
         assert updated.description == "kept"
         assert updated.parentId == root.id
         assert updated.rootId == root.id
-        assert updated.depth == 1
     }
 
     @Test
-    void testMarkingDoneRecordsTheCompletionDate() {
+    void testClosingAGoalRecordsTheCompletionDate() {
         Goal root = service.createRoot(OWNER, rootGoal())
 
-        Goal done = service.update(OWNER, root.id, new Goal(status: GoalStatus.DONE))
+        Goal closed = service.update(OWNER, root.id, new Goal(status: GoalStatus.COMPLETED))
 
-        assert done.completedDate
+        assert closed.completedDate
     }
 
     @Test
     void testUpdateValidatesTheMergedGoal() {
         Goal root = service.createRoot(OWNER, rootGoal())
 
-        assertBadRequest { service.update(OWNER, root.id, new Goal(kind: GoalKind.STEP)) }
+        assertBadRequest { service.update(OWNER, root.id, new Goal(status: "paused")) }
+        assertBadRequest { service.update(OWNER, root.id, new Goal(endDate: day(1))) }
     }
 
     @Test
-    void testTreeNestsChildrenAndMetricsInSortOrder() {
+    void testTreeNestsChildrenAndMetricsInStartDateOrder() {
         Goal root = service.createRoot(OWNER, rootGoal())
-        Goal sleep = service.createChild(OWNER, root.id, new Goal(title: "Sleep", sortOrder: 2))
-        Goal cardio = service.createChild(OWNER, root.id, new Goal(title: "Cardio", sortOrder: 1))
+        Goal sleep = service.createChild(OWNER, root.id, new Goal(title: "Sleep", startDate: day(30)))
+        Goal cardio = service.createChild(OWNER, root.id, new Goal(title: "Cardio", startDate: day(10)))
         service.createChild(OWNER, cardio.id, new Goal(title: "Zone 2"))
-        store.metricService().create(OWNER, root.id, new GoalMetric(name: "Resting heart rate", direction: GoalMetric.DECREASE))
-        store.metricService().create(OWNER, sleep.id, new GoalMetric(name: "Sleep quality", type: GoalMetric.SCALE, scaleMin: 1, scaleMax: 5))
+        store.metricService().create(OWNER, root.id, new GoalMetric(name: "Resting heart rate", direction: MetricDirection.DECREASE))
+        store.metricService().create(OWNER, sleep.id, new GoalMetric(name: "Sleep quality", type: MetricType.SCALE, scaleMin: 1, scaleMax: 5))
 
         GoalTreeNode tree = service.tree(OWNER, root.id)
 

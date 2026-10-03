@@ -32,9 +32,7 @@ Given(~/^a root goal is created$/) { ->
 Then(~/^the root goal is active and owned by the caller$/) { ->
     assert root.id
     assert root.status == "active"
-    assert root.kind == "outcome"
     assert root.ownerId
-    assert root.automation.level == "manual"
 }
 
 Then(~/^the root goal is listed$/) { ->
@@ -63,14 +61,18 @@ Then(~/^the tree shows the step with its metric$/) { ->
     assert tree.children.size() == 1
     Map step = tree.children[0] as Map
     assert step.goal.id == child.id
-    assert step.goal.depth == 1
+    assert step.goal.definitionOfDone == "Done when acceptance passes"
     assert step.goal.rootId == root.id
     assert step.metrics*.id == [metric.id]
-    assert step.metrics[0].choices*.label == ["Yes", "No"]
+    assert step.metrics[0].choices*.value == ["yes", "no"]
+    assert step.metrics[0].frequency == "daily"
+    assert step.metrics[0].source == "manual"
 }
 
 Then(~/^the observation is labelled "(.*)"$/) { String label ->
     assert observation.label == label
+    assert observation.choice == "yes"
+    assert observation.value == 1
     assert fetchObservations()*.id == [observation.id]
 }
 
@@ -94,6 +96,6 @@ When(~/^I request the goal "(.*)"$/) { String id ->
     attemptAuthenticatedGet("api/goal/${id}")
 }
 
-When(~/^I add a step without a definition of done$/) { ->
-    attemptAuthenticatedPost("api/goal/${root.id}/child", [title: "vague", kind: "step"])
+When(~/^I add a child that ends after the root goal$/) { ->
+    attemptAuthenticatedPost("api/goal/${root.id}/child", [title: "too late", endDate: "2027-06-30"])
 }

@@ -26,7 +26,7 @@ Feature: Goal trees
     When I request the goal "1"
     Then the request is rejected
 
-  Scenario: A step needs a definition of done
+  Scenario: A child goal must fit within its parent's dates
     Given a root goal is created
-    When I add a step without a definition of done
+    When I add a child that ends after the root goal
     Then the request is rejected

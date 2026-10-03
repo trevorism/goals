@@ -1,9 +1,7 @@
 package com.trevorism.service
 
-import com.trevorism.model.Automation
 import com.trevorism.model.Goal
 import com.trevorism.model.GoalAdjustment
-import com.trevorism.model.GoalKind
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
 import com.trevorism.model.GoalStatus
@@ -43,8 +41,6 @@ class GoalService {
     Goal createRoot(String ownerId, Goal goal) {
         goal.parentId = null
         goal.rootId = null
-        goal.depth = 0
-        goal.kind = goal.kind ?: GoalKind.OUTCOME
         applyCreateDefaults(goal)
         require(goal.startDate != null && goal.endDate != null, "startDate and endDate are required")
         validate(goal, null)
@@ -55,13 +51,8 @@ class GoalService {
         Goal parent = goalRepository.get(ownerId, parentId)
         goal.parentId = parent.id
         goal.rootId = parent.treeRootId()
-        goal.depth = (parent.depth ?: 0) + 1
-        goal.kind = goal.kind ?: GoalKind.MILESTONE
         goal.startDate = goal.startDate ?: parent.startDate
         goal.endDate = goal.endDate ?: parent.endDate
-        if (goal.sortOrder == null) {
-            goal.sortOrder = goalRepository.listWhere(ownerId, "parentId", parent.id).size()
-        }
         applyCreateDefaults(goal)
         validate(goal, parent)
         goalRepository.create(ownerId, goal)
@@ -72,15 +63,11 @@ class GoalService {
         String previousStatus = existing.status
         existing.title = changes.title ?: existing.title
         existing.description = changes.description ?: existing.description
-        existing.kind = changes.kind ?: existing.kind
         existing.status = changes.status ?: existing.status
         existing.startDate = changes.startDate ?: existing.startDate
         existing.endDate = changes.endDate ?: existing.endDate
         existing.definitionOfDone = changes.definitionOfDone ?: existing.definitionOfDone
-        existing.weight = changes.weight != null ? changes.weight : existing.weight
-        existing.sortOrder = changes.sortOrder != null ? changes.sortOrder : existing.sortOrder
-        existing.automation = changes.automation?.level ? changes.automation : existing.automation
-        if (existing.status == GoalStatus.DONE && previousStatus != GoalStatus.DONE) {
+        if (existing.status != GoalStatus.ACTIVE && previousStatus == GoalStatus.ACTIVE) {
             existing.completedDate = new Date()
         }
         Goal parent = existing.parentId ? goalRepository.get(ownerId, existing.parentId) : null
@@ -127,7 +114,7 @@ class GoalService {
     }
 
     private static GoalTreeNode buildNode(Goal goal, Map<String, List<Goal>> childrenByParent, Map<String, List<GoalMetric>> metricsByGoal) {
-        List<Goal> children = (childrenByParent[goal.id] ?: []).sort { it.sortOrder ?: 0 }
+        List<Goal> children = (childrenByParent[goal.id] ?: []).sort { a, b -> a.startDate <=> b.startDate ?: a.createdDate <=> b.createdDate }
         new GoalTreeNode(
                 goal: goal,
                 metrics: metricsByGoal[goal.id] ?: [],
@@ -136,21 +123,14 @@ class GoalService {
 
     private static void applyCreateDefaults(Goal goal) {
         goal.status = goal.status ?: GoalStatus.ACTIVE
-        goal.weight = goal.weight != null ? goal.weight : 1d
-        goal.sortOrder = goal.sortOrder ?: 0
-        goal.automation = goal.automation?.level ? goal.automation : new Automation(level: Automation.MANUAL)
         goal.createdDate = new Date()
-        goal.completedDate = goal.status == GoalStatus.DONE ? new Date() : null
+        goal.completedDate = goal.status != GoalStatus.ACTIVE ? new Date() : null
     }
 
     private static void validate(Goal goal, Goal parent) {
         require(goal.title?.trim() as boolean, "title is required")
-        requireOneOf(goal.kind, GoalKind.ALL, "kind")
         requireOneOf(goal.status, GoalStatus.ALL, "status")
-        requireOneOf(goal.automation.level, Automation.LEVELS, "automation.level")
-        require(goal.weight > 0, "weight must be positive")
         require(goal.endDate.after(goal.startDate), "endDate must be after startDate")
-        require(goal.kind != GoalKind.STEP || goal.definitionOfDone?.trim(), "a step requires a definitionOfDone")
         if (parent) {
             require(!goal.startDate.before(parent.startDate) && !goal.endDate.after(parent.endDate),
                     "dates must fall within the parent goal's dates")

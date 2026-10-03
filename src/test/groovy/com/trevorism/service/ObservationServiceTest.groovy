@@ -1,9 +1,11 @@
 package com.trevorism.service
 
+import com.trevorism.model.Choice
 import com.trevorism.model.Goal
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
-import com.trevorism.model.MetricChoice
+import com.trevorism.model.MetricSource
+import com.trevorism.model.MetricType
 import com.trevorism.support.TestStore
 import org.junit.jupiter.api.Test
 
@@ -26,31 +28,35 @@ class ObservationServiceTest {
 
     @Test
     void testNumericObservationDefaultsAndMarksTheMetricCollected() {
-        GoalMetric weight = metric(type: GoalMetric.NUMERIC)
+        GoalMetric weight = metric(type: MetricType.NUMERIC)
 
         GoalObservation observation = service.create(OWNER, weight.id, new GoalObservation(value: 201.5))
 
         assert observation.metricId == weight.id
         assert observation.ownerId == OWNER
         assert observation.observedAt
-        assert observation.source == "manual"
+        assert observation.source == MetricSource.MANUAL
         assert !observation.missed
         assert store.metricRepository.get(OWNER, weight.id).lastCollectedAt
         assertBadRequest { service.create(OWNER, weight.id, new GoalObservation()) }
     }
 
     @Test
-    void testBooleanObservationsAreOneOrZeroAndLabelled() {
-        GoalMetric walked = metric(type: GoalMetric.BOOLEAN)
+    void testBooleanObservationsAcceptAChoiceOrOneAndZero() {
+        GoalMetric walked = metric(type: MetricType.BOOLEAN)
 
-        assert service.create(OWNER, walked.id, new GoalObservation(value: 1)).label == "Yes"
-        assert service.create(OWNER, walked.id, new GoalObservation(value: 0)).label == "No"
+        GoalObservation yes = service.create(OWNER, walked.id, new GoalObservation(choice: "yes"))
+        GoalObservation no = service.create(OWNER, walked.id, new GoalObservation(value: 0))
+
+        assert [yes.choice, yes.value, yes.label] == ["yes", 1d, "Yes"]
+        assert [no.choice, no.value, no.label] == ["no", 0d, "No"]
         assertBadRequest { service.create(OWNER, walked.id, new GoalObservation(value: 2)) }
+        assertBadRequest { service.create(OWNER, walked.id, new GoalObservation(choice: "maybe")) }
     }
 
     @Test
     void testScaleObservationsMustBeInRange() {
-        GoalMetric energy = metric(type: GoalMetric.SCALE, scaleMin: 1, scaleMax: 5)
+        GoalMetric energy = metric(type: MetricType.SCALE, scaleMin: 1, scaleMax: 5)
 
         assert service.create(OWNER, energy.id, new GoalObservation(value: 4)).value == 4d
         assertBadRequest { service.create(OWNER, energy.id, new GoalObservation(value: 6)) }
@@ -58,38 +64,42 @@ class ObservationServiceTest {
     }
 
     @Test
-    void testChoiceObservationsTakeTheChoiceLabel() {
-        GoalMetric meal = metric(type: GoalMetric.CHOICE, choices: [new MetricChoice(label: "poor"), new MetricChoice(label: "good")])
+    void testChoiceObservationsRecordTheChoiceItsLabelAndPosition() {
+        GoalMetric meal = metric(type: MetricType.CHOICE, choices: [new Choice(label: "Poor"), new Choice(label: "OK"), new Choice(label: "Good")])
 
-        assert service.create(OWNER, meal.id, new GoalObservation(value: 1)).label == "good"
-        assertBadRequest { service.create(OWNER, meal.id, new GoalObservation(value: 2)) }
-        assertBadRequest { service.create(OWNER, meal.id, new GoalObservation(value: 0.5)) }
+        GoalObservation good = service.create(OWNER, meal.id, new GoalObservation(choice: "good"))
+
+        assert [good.choice, good.label, good.value] == ["good", "Good", 2d]
+        assertBadRequest { service.create(OWNER, meal.id, new GoalObservation(choice: "great")) }
+        assertBadRequest { service.create(OWNER, meal.id, new GoalObservation(value: 1)) }
     }
 
     @Test
     void testTextObservationsRequireALabelAndHaveNoValue() {
-        GoalMetric journal = metric(type: GoalMetric.TEXT)
+        GoalMetric journal = metric(type: MetricType.TEXT)
 
-        GoalObservation entry = service.create(OWNER, journal.id, new GoalObservation(label: "Slept badly", value: 3))
+        GoalObservation entry = service.create(OWNER, journal.id, new GoalObservation(label: "Slept badly", value: 3, choice: "x"))
 
         assert entry.value == null
+        assert entry.choice == null
         assertBadRequest { service.create(OWNER, journal.id, new GoalObservation(label: " ")) }
     }
 
     @Test
     void testMissedObservationsCarryNoValue() {
-        GoalMetric walked = metric(type: GoalMetric.BOOLEAN)
+        GoalMetric walked = metric(type: MetricType.BOOLEAN)
 
-        GoalObservation missed = service.create(OWNER, walked.id, new GoalObservation(missed: true, value: 1))
+        GoalObservation missed = service.create(OWNER, walked.id, new GoalObservation(missed: true, choice: "yes"))
 
         assert missed.missed
         assert missed.value == null
+        assert missed.choice == null
         assert missed.label == null
     }
 
     @Test
     void testListIsOrderedByObservedDate() {
-        GoalMetric weight = metric(type: GoalMetric.NUMERIC)
+        GoalMetric weight = metric(type: MetricType.NUMERIC)
         service.create(OWNER, weight.id, new GoalObservation(value: 199, observedAt: day(20)))
         service.create(OWNER, weight.id, new GoalObservation(value: 201, observedAt: day(10)))
 
@@ -98,11 +108,21 @@ class ObservationServiceTest {
 
     @Test
     void testUpdateRevalidatesAgainstTheMetric() {
-        GoalMetric energy = metric(type: GoalMetric.SCALE, scaleMin: 1, scaleMax: 5)
+        GoalMetric energy = metric(type: MetricType.SCALE, scaleMin: 1, scaleMax: 5)
         GoalObservation observation = service.create(OWNER, energy.id, new GoalObservation(value: 3))
 
         assert service.update(OWNER, observation.id, new GoalObservation(value: 5, note: "great day")).note == "great day"
         assertBadRequest { service.update(OWNER, observation.id, new GoalObservation(value: 9)) }
+    }
+
+    @Test
+    void testUpdateCanChangeTheChoice() {
+        GoalMetric walked = metric(type: MetricType.BOOLEAN)
+        GoalObservation observation = service.create(OWNER, walked.id, new GoalObservation(choice: "no"))
+
+        GoalObservation updated = service.update(OWNER, observation.id, new GoalObservation(choice: "yes"))
+
+        assert [updated.choice, updated.value, updated.label] == ["yes", 1d, "Yes"]
     }
 
     @Test

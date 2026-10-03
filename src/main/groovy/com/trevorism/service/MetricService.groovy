@@ -4,8 +4,10 @@ import com.trevorism.model.Frequency
 import com.trevorism.model.Goal
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
-import com.trevorism.model.MetricChoice
+import com.trevorism.model.MetricDirection
+import com.trevorism.model.MetricRole
 import com.trevorism.model.MetricSource
+import com.trevorism.model.MetricType
 import jakarta.inject.Named
 import jakarta.inject.Singleton
 
@@ -40,12 +42,12 @@ class MetricService {
         Goal goal = goalRepository.get(ownerId, goalId)
         metric.goalId = goal.id
         metric.rootId = goal.treeRootId()
-        metric.type = metric.type ?: GoalMetric.NUMERIC
-        metric.role = metric.role ?: GoalMetric.OUTCOME
+        metric.type = metric.type ?: MetricType.NUMERIC
+        metric.role = metric.role ?: MetricRole.OUTCOME
         metric.enabled = metric.enabled != null ? metric.enabled : true
-        metric.frequency = withFrequencyDefaults(metric.frequency)
-        metric.source = metric.source?.type ? metric.source : new MetricSource(type: MetricSource.MANUAL, config: [:])
-        metric.choices = normalizeChoices(metric)
+        metric.frequency = metric.frequency ?: Frequency.DAILY
+        metric.source = metric.source ?: MetricSource.MANUAL
+        metric.choices = choicesFor(metric)
         metric.direction = defaultDirection(metric)
         metric.nextDueAt = metric.nextDueAt ?: new Date()
         metric.lastCollectedAt = null
@@ -56,6 +58,7 @@ class MetricService {
 
     GoalMetric update(String ownerId, String id, GoalMetric changes) {
         GoalMetric existing = metricRepository.get(ownerId, id)
+        require(changes.type == null || changes.type == existing.type, "a metric's type cannot change")
         existing.name = changes.name ?: existing.name
         existing.unit = changes.unit ?: existing.unit
         existing.description = changes.description ?: existing.description
@@ -68,11 +71,10 @@ class MetricService {
         existing.scaleMin = changes.scaleMin != null ? changes.scaleMin : existing.scaleMin
         existing.scaleMax = changes.scaleMax != null ? changes.scaleMax : existing.scaleMax
         existing.choices = changes.choices ?: existing.choices
-        existing.frequency = changes.frequency ? withFrequencyDefaults(changes.frequency) : existing.frequency
-        existing.source = changes.source?.type ? changes.source : existing.source
+        existing.frequency = changes.frequency ?: existing.frequency
+        existing.source = changes.source ?: existing.source
         existing.enabled = changes.enabled != null ? changes.enabled : existing.enabled
-        require(changes.type == null || changes.type == existing.type, "a metric's type cannot change")
-        existing.choices = normalizeChoices(existing)
+        existing.choices = choicesFor(existing)
         validate(existing)
         metricRepository.update(ownerId, id, existing)
     }
@@ -83,59 +85,41 @@ class MetricService {
         metricRepository.delete(ownerId, id)
     }
 
-    private static Frequency withFrequencyDefaults(Frequency frequency) {
-        Frequency result = frequency ?: new Frequency()
-        result.type = result.type ?: Frequency.DAILY
-        result.interval = result.interval ?: 1
-        result.timezone = result.timezone ?: "UTC"
-        return result
-    }
-
-    private static List<MetricChoice> normalizeChoices(GoalMetric metric) {
-        if (metric.type == GoalMetric.BOOLEAN) {
-            return [new MetricChoice(value: "1", label: "Yes", score: 1d), new MetricChoice(value: "0", label: "No", score: 0d)]
+    private static List choicesFor(GoalMetric metric) {
+        if (metric.type == MetricType.BOOLEAN) {
+            return MetricChoices.yesNo()
         }
-        if (metric.type != GoalMetric.CHOICE) {
-            return []
-        }
-        List<MetricChoice> choices = metric.choices ?: []
-        choices.eachWithIndex { MetricChoice choice, int index ->
-            choice.value = String.valueOf(index)
-        }
-        return choices
+        metric.type == MetricType.CHOICE ? MetricChoices.normalize(metric.choices) : []
     }
 
     private static String defaultDirection(GoalMetric metric) {
         if (metric.direction) {
             return metric.direction
         }
-        metric.type in [GoalMetric.NUMERIC, GoalMetric.SCALE] ? GoalMetric.INCREASE : null
+        metric.type in [MetricType.NUMERIC, MetricType.SCALE] ? MetricDirection.INCREASE : null
     }
 
     private static void validate(GoalMetric metric) {
         require(metric.name?.trim() as boolean, "name is required")
-        requireOneOf(metric.type, GoalMetric.TYPES, "type")
-        requireOneOf(metric.role, GoalMetric.ROLES, "role")
-        requireOneOf(metric.frequency.type, Frequency.TYPES, "frequency.type")
-        require(metric.frequency.interval > 0, "frequency.interval must be positive")
-        requireOneOf(metric.source.type, MetricSource.TYPES, "source.type")
-        if (metric.type in [GoalMetric.NUMERIC, GoalMetric.SCALE]) {
-            requireOneOf(metric.direction, GoalMetric.DIRECTIONS, "direction")
+        requireOneOf(metric.type, MetricType.ALL, "type")
+        requireOneOf(metric.role, MetricRole.ALL, "role")
+        requireOneOf(metric.frequency, Frequency.ALL, "frequency")
+        requireOneOf(metric.source, MetricSource.ALL, "source")
+        if (metric.type in [MetricType.NUMERIC, MetricType.SCALE]) {
+            requireOneOf(metric.direction, MetricDirection.ALL, "direction")
         }
-        if (metric.direction == GoalMetric.MAINTAIN) {
+        if (metric.direction == MetricDirection.MAINTAIN) {
             require(metric.tolerance != null && metric.tolerance >= 0, "a maintain metric requires a non-negative tolerance")
         }
-        if (metric.type == GoalMetric.SCALE) {
+        if (metric.type == MetricType.SCALE) {
             require(metric.scaleMin != null && metric.scaleMax != null && metric.scaleMin < metric.scaleMax,
                     "a scale metric requires scaleMin < scaleMax")
         }
-        if (metric.type == GoalMetric.BOOLEAN && metric.targetRate != null) {
+        if (metric.type == MetricType.BOOLEAN && metric.targetRate != null) {
             require(metric.targetRate > 0 && metric.targetRate <= 1, "targetRate must be in (0, 1]")
         }
-        if (metric.type == GoalMetric.CHOICE) {
-            require(metric.choices.size() >= 2, "a choice metric requires at least two choices")
-            require(metric.choices.every { it.label?.trim() }, "every choice requires a label")
-            require(metric.choices.every { it.score == null || (it.score >= 0 && it.score <= 1) }, "choice scores must be in [0, 1]")
+        if (metric.type == MetricType.CHOICE) {
+            MetricChoices.validate(metric.choices)
         }
     }
 }

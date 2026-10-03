@@ -128,40 +128,52 @@ datastore-client matches them case-insensitively. The tables below use the store
   it's set.
 - **Unknown ids:** datastore returns a 500 for an unknown id, so `OwnedRepository` turns it into a 404.
 
+Every entity is **flat**: fields are strings, numbers, dates and booleans. The only lists are
+`GoalMetric.choices`, which follows prompt's `Choice {value, label}` convention, and
+`GoalAdjustment.metricIds`, a list of strings. Every string indicator is a plain `String` field whose
+allowed values are listed in a values class (constants plus an `ALL` list), checked on create and update:
+
+| Values class | Field | Values |
+|---|---|---|
+| `GoalStatus` | `Goal.status` | `active` \| `completed` \| `missed` \| `abandoned` |
+| `MetricType` | `GoalMetric.type` | `numeric` \| `boolean` \| `scale` \| `choice` \| `text` |
+| `MetricRole` | `GoalMetric.role` | `outcome` (lag) \| `effort` (lead) |
+| `MetricDirection` | `GoalMetric.direction` | `increase` \| `decrease` \| `maintain` |
+| `Frequency` | `GoalMetric.frequency` | `daily` \| `weekly` \| `monthly` |
+| `MetricSource` | `GoalMetric.source`, `GoalObservation.source` | `manual` \| `prompt` \| `http` \| `event` \| `aggregation` |
+| `AdjustmentCategory` | `GoalAdjustment.category` | `habit` \| `tool` \| `environment` \| `plan` \| `other` |
+
 ### 4.1 Goal (the tree node)
 | Field | Notes |
 |---|---|
 | id, ownerid | |
-| parentid, rootid, depth | `rootid` is empty on a root and holds the root id on descendants. One filter on `rootid` loads a whole tree. |
+| parentid, rootid | `rootid` is empty on a root and holds the root id on descendants. One filter on `rootid` loads a whole tree. |
 | title, description | |
-| kind | `outcome` \| `milestone` \| `step` |
-| status | `draft` \| `active` \| `done` \| `missed` \| `abandoned` |
+| status | `GoalStatus`; `active` by default. Leaving `active` sets `completeddate`. |
 | startdate, enddate | Children inherit the parent's dates by default and must fit inside them. |
-| definitionofdone | Required before a node can become `kind=step`. |
-| weight | Default 1. Used in rollups. |
-| sortorder | Order among siblings. |
-| automation | An embedded `Automation` (section 8). |
+| definitionofdone | Optional. Describes when a concrete step counts as done. |
 | createddate, completeddate | |
 
-- `kind` changes as a goal is decomposed: `outcome` at the root, `milestone` in the middle, and
-  `step` once a node is concrete.
-- A `step` is actionable: it has a definition of done, a timeframe of about a week, and someone or
-  something that will do it.
+- There is no stored type, depth, order, weight or automation setting. A node is a root when
+  `parentid` is empty; children are ordered by `startdate`, then `createddate`; rollups weigh
+  children equally.
+- A node with a definition of done and a short timeframe is a concrete step. Breakdown (phase 3) and
+  automation (phase 5) add flat fields when they need them.
 
 ### 4.2 Metric
 | Field | Notes |
 |---|---|
 | id, ownerid, goalid, rootid | `rootid` is copied from the goal so a whole tree's metrics load with one filter |
 | name, unit, description | |
-| type | `numeric` \| `boolean` \| `scale` \| `choice` \| `text` |
-| role | `outcome` (lag) \| `effort` (lead) |
-| direction | `increase` \| `decrease` \| `maintain` (numeric and scale) |
-| baseline, target, tolerance | `tolerance` is used for `maintain` |
+| type | `MetricType`; `numeric` by default; can't change after creation |
+| role | `MetricRole`; `outcome` by default |
+| direction | `MetricDirection`; numeric and scale only; `increase` by default |
+| baseline, target, tolerance | `tolerance` is required for `maintain` |
 | targetrate | boolean: required share of yes answers, e.g. 0.857 (6/7) |
 | scalemin, scalemax | scale only |
-| choices | `[{value, label, score}]`. `score` (0–1) is optional; without it, the metric isn't scored. |
-| frequency | `{type: daily\|weekly\|monthly\|everyndays, interval, dayofweek, dayofmonth, timeofday, timezone}` |
-| source | `{type: manual\|prompt\|http\|event\|aggregation, config}` (section 6) |
+| choices | `[{value, label}]`, as in prompt. A missing value is derived from the label (`"Just OK"` → `just-ok`) and made unique. Boolean metrics always get `yes`/`no`. |
+| frequency | `Frequency`; `daily` by default |
+| source | `MetricSource`; `manual` by default |
 | nextdueat, lastcollectedat, enabled | |
 
 ### 4.3 Observation
@@ -169,15 +181,16 @@ datastore-client matches them case-insensitively. The tables below use the store
 |---|---|
 | id, ownerid, metricid | |
 | observedat | The date the value applies to. For a daily habit this is the day, not when it was answered. |
-| value | Number: numeric value, 1/0 for boolean, the scale point, or the choice index. Empty for text. |
-| label | Choice label or text answer |
+| value | Number: the numeric value, 1/0 for boolean, the scale point, or the choice's position (for charting). Empty for text. |
+| choice | Boolean and choice metrics: the selected choice's value, matching prompt's `selectedChoices` |
+| label | The selected choice's label, or the text answer |
 | note | |
-| source, sourceref | e.g. `prompt` + answerId, `http` + runId, `manual` |
+| source, sourceref | `MetricSource`, e.g. `prompt` + answerId, `manual` |
 | missed | `true` for a period nobody answered |
 
 ### 4.4 Adjustment
 `id, ownerid, goalid, metricids[] (empty = all metrics in the subtree), effectivedate, title,
-description, category (habit|tool|environment|plan|other)`
+description, category (AdjustmentCategory; other by default)`
 
 ### 4.5 PendingAsk
 `id, ownerid, metricid, questionid, periodstart, periodend, status (open|answered|missed|invalid),
@@ -206,13 +219,13 @@ scored metric produces a **progress score p ∈ [0, 1]**.
 | numeric | number | `clamp((current − baseline) / (target − baseline))`, where `current` is the fitted value at the latest observation. For `maintain`, the share of the last N observations within `tolerance`. | Scatter, best fit, plan line, target band |
 | boolean | Yes/No choices → 1/0 | `min(adherence / targetrate, 1)` over a rolling window (default 4 periods). Missed periods count as 0. | Calendar heatmap, rolling adherence line, current and best streak |
 | scale | choices `scalemin..scalemax` | Rolling mean, normalized between baseline and target | Line with best fit |
-| choice | choices with `score` | Rolling mean of scores. Not scored if any choice has no score. | Stacked frequency per period |
+| choice | choices, ordered worst to best | Rolling mean of position ÷ (choices − 1) | Stacked frequency per period |
 | text | free text | Not scored | Journal timeline under the chart |
 
 ### Rollup
-- **Effort progress:** the weighted mean of the children's progress. A `step` counts as 1 when it is
-  `done`; otherwise it uses its effort metrics, or 0 if it has none.
-- **Outcome progress:** the weighted mean of the node's own outcome metrics.
+- **Effort progress:** the mean of the children's progress. A concrete step counts as 1 when it is
+  `completed`; otherwise it uses its effort metrics, or 0 if it has none.
+- **Outcome progress:** the mean of the node's own outcome metrics.
 - Each node shows both numbers. A node's headline number is its outcome progress if it has outcome
   metrics, otherwise its effort progress.
 
@@ -298,8 +311,8 @@ server, so the UI and the emails always agree.
 ## 8. Automation
 
 ### 8.1 The automation ladder
-`Goal.automation = {level, actionid, params, requiresapproval, schedule, lastrunat, lastresult,
-consecutivefailures}`
+Phase 5 adds flat automation fields to `Goal` (for example `automationlevel`, `automationaction`), with an
+`AutomationLevel` values class.
 
 | Level | Meaning | How it works |
 |---|---|---|
