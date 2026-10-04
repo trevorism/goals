@@ -116,6 +116,10 @@ class AnswerIntakeService {
                 observation.value = Double.valueOf(selected.first())
                 return null
             case MetricType.NUMERIC:
+                if (answer.value instanceof Number) {
+                    observation.value = (answer.value as Number).doubleValue()
+                    return null
+                }
                 String number = firstNumber(text)
                 if (number == null) return "Couldn't read a number from \"${text ?: ''}\"".toString()
                 observation.value = Double.valueOf(number)

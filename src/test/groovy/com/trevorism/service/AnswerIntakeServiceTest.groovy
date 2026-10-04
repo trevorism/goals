@@ -68,6 +68,9 @@ class AnswerIntakeServiceTest {
         GoalObservation number = new GoalObservation()
         assert AnswerIntakeService.fill(number, new GoalMetric(type: MetricType.NUMERIC), [text: "about 1,204.5 steps"]) == null
         assert number.value == 1204.5d
+        GoalObservation typed = new GoalObservation()
+        assert AnswerIntakeService.fill(typed, new GoalMetric(type: MetricType.NUMERIC), [text: "182.5 lb", value: 182.5]) == null
+        assert typed.value == 182.5d
         GoalObservation negative = new GoalObservation()
         AnswerIntakeService.fill(negative, new GoalMetric(type: MetricType.NUMERIC), [text: "-3"])
         assert negative.value == -3d

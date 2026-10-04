@@ -1,3 +1,7 @@
+## 0.7.0
+
+- Numeric metrics are asked in prompt as number questions with their unit, so you answer in a number input instead of free text. Answers use prompt's numeric value. Needs prompt 1.3.0.
+
 ## 0.6.1
 
 - Fix provisioning: the base URL lost its `https:` because Micronaut reads every `:` in an inline placeholder default as another fallback. The URL is now a constant in code.
