@@ -48,6 +48,19 @@ describe('goals', () => {
     expect(validateGoal({ ...form, endDate: new Date(2026, 9, 1) }, { requireDates: true })).toBe('The end date must be after the start date')
     expect(validateGoal(form, { requireDates: true })).toBe('')
   })
+
+  it('keeps a sub-goal within its parent, counting empty dates as the parent\u2019s', () => {
+    const bounds = { startDate: '2026-10-03T00:00:00Z', endDate: '2026-11-07T00:00:00Z' }
+    const child = (startDate, endDate) => ({ title: 'Zone 2', startDate, endDate })
+
+    expect(validateGoal(child(null, null), { requireDates: false, bounds })).toBe('')
+    expect(validateGoal(child(new Date(2026, 9, 10), new Date(2026, 10, 7)), { requireDates: false, bounds })).toBe('')
+    expect(validateGoal(child(null, new Date(2026, 10, 30)), { requireDates: false, bounds })).toBe(
+      'A sub-goal\u2019s dates must fall within its parent\u2019s: Oct 3, 2026 \u2013 Nov 7, 2026'.replace(/\u2019/g, "'")
+    )
+    expect(validateGoal(child(new Date(2026, 9, 1), null), { requireDates: false, bounds })).toContain('must fall within')
+    expect(validateGoal(child(new Date(2026, 10, 20), null), { requireDates: false, bounds })).toBe('The end date must be after the start date')
+  })
 })
 
 describe('metrics', () => {

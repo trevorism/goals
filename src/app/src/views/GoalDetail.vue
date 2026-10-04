@@ -36,6 +36,7 @@ const headlineExpected = computed(() => {
   const goalProgress = selectedProgress.value
   return goalProgress?.progress != null && goalProgress?.pace != null ? goalProgress.progress - goalProgress.pace : null
 })
+const parentGoal = computed(() => (selectedGoal.value?.parentId ? findNode(tree.value, selectedGoal.value.parentId)?.goal ?? null : null))
 const outcomeIsHeadline = computed(() => selectedProgress.value?.outcomeProgress != null)
 
 async function loadProgress() {
@@ -138,6 +139,7 @@ onMounted(load)
               v-if="mode === 'edit'"
               :goal="selectedGoal"
               :require-dates="isTreeRoot"
+              :bounds="parentGoal"
               show-status
               :saving="saving"
               @save="saveGoal"
@@ -214,8 +216,7 @@ onMounted(load)
         <va-card v-if="mode === 'child'" class="new-child">
           <va-card-title>New sub-goal of “{{ selectedGoal.title }}”</va-card-title>
           <va-card-content>
-            <p class="mb-2 text-sm text-slate-500">Leave the dates empty to use the parent's dates.</p>
-            <goal-form submit-label="Add sub-goal" :saving="saving" @save="addChild" @cancel="mode = 'view'" />
+            <goal-form submit-label="Add sub-goal" :bounds="selectedGoal" :saving="saving" @save="addChild" @cancel="mode = 'view'" />
           </va-card-content>
         </va-card>
 

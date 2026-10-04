@@ -1,6 +1,6 @@
 <script setup>
 import { reactive, ref } from 'vue'
-import { buildGoalPayload, fromDay, validateGoal } from '../forms.js'
+import { buildGoalPayload, formatDay, fromDay, validateGoal } from '../forms.js'
 import { GoalStatusType } from '../types.js'
 
 const props = defineProps({
@@ -8,7 +8,8 @@ const props = defineProps({
   requireDates: { type: Boolean, default: false },
   showStatus: { type: Boolean, default: false },
   submitLabel: { type: String, default: 'Save' },
-  saving: { type: Boolean, default: false }
+  saving: { type: Boolean, default: false },
+  bounds: { type: Object, default: null }
 })
 
 const emit = defineEmits(['save', 'cancel'])
@@ -25,7 +26,7 @@ const form = reactive({
 const error = ref('')
 
 function submit() {
-  error.value = validateGoal(form, { requireDates: props.requireDates })
+  error.value = validateGoal(form, { requireDates: props.requireDates, bounds: props.bounds })
   if (!error.value) {
     emit('save', buildGoalPayload(form))
   }
@@ -41,6 +42,9 @@ function submit() {
       <va-date-input v-model="form.endDate" label="End" :clearable="!requireDates" />
       <va-select v-if="showStatus" v-model="form.status" label="Status" :options="GoalStatusType.ALL" />
     </div>
+    <p v-if="bounds" class="date-bounds text-xs text-slate-500">
+      Dates must fall within the parent's: {{ formatDay(bounds.startDate) }} – {{ formatDay(bounds.endDate) }}. Leave them empty to use the parent's dates.
+    </p>
     <va-textarea v-model="form.definitionOfDone" label="Definition of done (optional)" autosize />
     <p v-if="error" class="form-error text-sm text-red-600">{{ error }}</p>
     <div class="flex gap-2">
