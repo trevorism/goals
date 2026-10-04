@@ -1,6 +1,6 @@
 ## 0.6.1
 
-- Fix provisioning: the base URL lost its `https:` because Micronaut reads every `:` in an inline placeholder default as another fallback. It now comes from `application.yml`.
+- Fix provisioning: the base URL lost its `https:` because Micronaut reads every `:` in an inline placeholder default as another fallback. The URL is now a constant in code.
 
 ## 0.6.0
 

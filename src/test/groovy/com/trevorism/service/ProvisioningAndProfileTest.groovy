@@ -24,7 +24,7 @@ class ProvisioningAndProfileTest {
                 get : { String url -> url.endsWith("/subscription") ? subscriptionsJson : tasksJson },
                 post: { String url, String body -> posts << [url, new JsonSlurper().parseText(body)]; "{}" }
         ] as SecureHttpClient
-        ProvisioningService service = new ProvisioningService(client, "https://goals.example.com")
+        ProvisioningService service = new ProvisioningService(client)
         service.clock = Clock.fixed(Instant.parse("2026-10-03T12:00:00Z"), ZoneOffset.UTC)
         return service
     }
@@ -35,11 +35,11 @@ class ProvisioningAndProfileTest {
 
         assert result == [subscription: ProvisioningService.CREATED, schedule: ProvisioningService.CREATED]
         assert posts[0][0] == "https://event.data.trevorism.com/subscription"
-        assert posts[0][1] == [name: "goals-question-answered", topic: "questionAnswered", url: "https://goals.example.com/api/event/questionAnswered"]
+        assert posts[0][1] == [name: "goals-question-answered", topic: "questionAnswered", url: "https://goals.action.trevorism.com/api/event/questionAnswered"]
         assert posts[1][0] == "https://schedule.action.trevorism.com/api/schedule"
         assert posts[1][1].name == "goals_daily_tick"
         assert posts[1][1].type == "daily"
-        assert posts[1][1].endpoint == "https://goals.example.com/api/collect/tick"
+        assert posts[1][1].endpoint == "https://goals.action.trevorism.com/api/collect/tick"
         assert posts[1][1].httpMethod == "post"
         assert posts[1][1].startDate == "2026-10-04T11:07:00Z"
     }
