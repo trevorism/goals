@@ -1,3 +1,9 @@
+## 0.8.1
+
+- Errors now show the real reason instead of "Bad Request", e.g. "A sub-goal's dates must fall within its parent's: Oct 3, 2026 – Nov 7, 2026".
+- The sub-goal form shows the parent's date range and checks it before saving.
+- Rejected requests are logged with their reason.
+
 ## 0.8.0
 
 - The home page is now a quiet dashboard. Each goal shows its status, progress against the plan, time elapsed, and one headline, such as the projected end value of its most concerning metric or the share of Yes answers for a habit.

@@ -10,6 +10,9 @@ import com.trevorism.model.types.GoalStatusType
 import jakarta.inject.Named
 import jakarta.inject.Singleton
 
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+
 import static com.trevorism.service.Validation.require
 import static com.trevorism.service.Validation.requireOneOf
 
@@ -132,13 +135,17 @@ class GoalService {
         goal.completedDate = goal.status != GoalStatusType.ACTIVE ? new Date() : null
     }
 
+    private static String formatDay(Date date) {
+        DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US).format(date.toInstant().atZone(ZoneOffset.UTC))
+    }
+
     private static void validate(Goal goal, Goal parent) {
         require(goal.title?.trim() as boolean, "title is required")
         requireOneOf(goal.status, GoalStatusType.ALL, "status")
-        require(goal.endDate.after(goal.startDate), "endDate must be after startDate")
+        require(goal.endDate.after(goal.startDate), "The end date must be after the start date")
         if (parent) {
             require(!goal.startDate.before(parent.startDate) && !goal.endDate.after(parent.endDate),
-                    "dates must fall within the parent goal's dates")
+                    "A sub-goal's dates must fall within its parent's: ${formatDay(parent.startDate)} – ${formatDay(parent.endDate)}".toString())
         }
     }
 }

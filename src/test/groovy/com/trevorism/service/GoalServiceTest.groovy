@@ -72,6 +72,11 @@ class GoalServiceTest {
     @Test
     void testChildDatesMustFallWithinTheParent() {
         Goal root = service.createRoot(OWNER, rootGoal())
+        Goal cardio = service.createChild(OWNER, root.id, new Goal(title: "Cardio", startDate: day(10), endDate: day(40)))
+        HttpStatusException error = assertThrows(HttpStatusException) { service.createChild(OWNER, cardio.id, new Goal(title: "Zone 2", endDate: day(50))) }
+        assert error.message == "A sub-goal's dates must fall within its parent's: Jan 10, 2027 – Feb 9, 2027"
+        HttpStatusException backwards = assertThrows(HttpStatusException) { service.createChild(OWNER, cardio.id, new Goal(title: "Zone 2", startDate: day(45))) }
+        assert backwards.message == "The end date must be after the start date"
 
         assertBadRequest { service.createChild(OWNER, root.id, new Goal(title: "late", endDate: new Date(day(365).time + 86_400_000L))) }
     }

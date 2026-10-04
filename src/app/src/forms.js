@@ -43,15 +43,22 @@ export function buildGoalPayload(form) {
   }
 }
 
-export function validateGoal(form, { requireDates }) {
+export function validateGoal(form, { requireDates, bounds = null }) {
   if (!form.title?.trim()) {
     return 'Enter a title'
   }
   if (requireDates && (!form.startDate || !form.endDate)) {
     return 'Choose a start and end date'
   }
-  if (form.startDate && form.endDate && toDay(form.endDate) <= toDay(form.startDate)) {
+  const boundStart = bounds ? toDay(fromDay(bounds.startDate)) : null
+  const boundEnd = bounds ? toDay(fromDay(bounds.endDate)) : null
+  const start = toDay(form.startDate) ?? boundStart
+  const end = toDay(form.endDate) ?? boundEnd
+  if (start && end && end <= start) {
     return 'The end date must be after the start date'
+  }
+  if (bounds && ((start && start < boundStart) || (end && end > boundEnd))) {
+    return `A sub-goal's dates must fall within its parent's: ${formatDay(bounds.startDate)} – ${formatDay(bounds.endDate)}`
   }
   return ''
 }

@@ -60,5 +60,5 @@ export const todayApi = {
 }
 
 export function errorMessage(error) {
-  return error?.response?.data?.message || error?.response?.data?._embedded?.errors?.[0]?.message || error?.message || 'Request failed'
+  return error?.response?.data?._embedded?.errors?.[0]?.message || error?.response?.data?.message || error?.message || 'Request failed'
 }

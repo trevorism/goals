@@ -52,6 +52,17 @@ describe('GoalForm', () => {
     expect(labelled(mount(GoalForm, { global: { stubs } }), '.va-select', 'Status')).toBeUndefined()
   })
 
+  it('shows the parent\u2019s range and stops dates outside it', async () => {
+    const bounds = { startDate: '2026-10-03T00:00:00Z', endDate: '2026-11-07T00:00:00Z' }
+    const wrapper = mount(GoalForm, { props: { goal: { title: 'Zone 2', endDate: '2026-12-01T00:00:00Z' }, bounds }, global: { stubs } })
+
+    expect(wrapper.find('.date-bounds').text()).toContain('Oct 3, 2026 \u2013 Nov 7, 2026')
+    await button(wrapper, 'Save').trigger('click')
+
+    expect(wrapper.emitted('save')).toBeUndefined()
+    expect(wrapper.find('.form-error').text()).toContain('must fall within its parent')
+  })
+
   it('cancels', async () => {
     const wrapper = mount(GoalForm, { global: { stubs } })
 

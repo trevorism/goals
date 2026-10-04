@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import axios from 'axios'
-import { syncTimezone } from '../src/api.js'
+import { errorMessage, syncTimezone } from '../src/api.js'
 
 vi.mock('axios', () => ({ default: { get: vi.fn(), put: vi.fn() } }))
 
@@ -33,5 +33,15 @@ describe('syncTimezone', () => {
 
     expect(await syncTimezone(memoryStorage())).toBe(true)
     expect(axios.put).not.toHaveBeenCalled()
+  })
+})
+
+describe('errorMessage', () => {
+  it('prefers the specific reason over the generic status text', () => {
+    const error = { response: { data: { message: 'Bad Request', _embedded: { errors: [{ message: 'The end date must be after the start date' }] } } } }
+
+    expect(errorMessage(error)).toBe('The end date must be after the start date')
+    expect(errorMessage({ response: { data: { message: 'Forbidden' } } })).toBe('Forbidden')
+    expect(errorMessage(new Error('Network Error'))).toBe('Network Error')
   })
 })
