@@ -30,7 +30,7 @@ class ProvisioningService {
     Clock clock = Clock.systemUTC()
 
     ProvisioningService(@Named("appClientSecureHttpClient") SecureHttpClient client,
-                        @Value('${goals.base-url:https://goals.action.trevorism.com}') String baseUrl) {
+                        @Value('${goals.base-url}') String baseUrl) {
         this.client = client
         this.baseUrl = baseUrl
     }

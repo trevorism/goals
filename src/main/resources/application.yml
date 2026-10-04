@@ -23,3 +23,5 @@ netty:
   default:
     allocator:
       max-order: 3
+goals:
+  base-url: https://goals.action.trevorism.com
