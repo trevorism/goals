@@ -15,8 +15,10 @@ class PromptQuestions {
     private static final DateTimeFormatter WEEK = DateTimeFormatter.ofPattern("MMM d", Locale.US)
     private static final DateTimeFormatter MONTH = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.US)
 
+    static final String NUMBER_ANSWER = "number"
+
     static Map build(GoalMetric metric, Goal goal, CollectionPeriod period, String ownerId) {
-        [
+        Map question = [
                 text                : text(metric, goal, period),
                 kind                : QUESTION_KIND,
                 targetIdentityId    : ownerId,
@@ -25,6 +27,13 @@ class PromptQuestions {
                 choices             : choices(metric),
                 allowMultipleAnswers: false
         ]
+        if (metric.type == MetricType.NUMERIC) {
+            question.answerType = NUMBER_ANSWER
+            if (metric.unit) {
+                question.unit = metric.unit
+            }
+        }
+        return question
     }
 
     static String text(GoalMetric metric, Goal goal, CollectionPeriod period) {
@@ -43,7 +52,6 @@ class PromptQuestions {
 
     private static String instruction(GoalMetric metric) {
         switch (metric.type) {
-            case MetricType.NUMERIC: return ". Reply with a number."
             case MetricType.TEXT: return ". Reply in your own words."
             default: return ""
         }

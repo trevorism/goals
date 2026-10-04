@@ -281,9 +281,10 @@ counts as No.
 - **Question:** `targetIdentityId` = the owner, `privateQuestion = true` (only goals and the owner can
   see it), `kind = question`, `dueDate` = the end of the period in the owner's timezone.
   - Choices: yes/no and choice metrics use their own choice values. Scale metrics offer each point
-    (`"1"`..`"5"`). Numeric and text metrics take a free-text answer.
+    (`"1"`..`"5"`). Numeric metrics ask with `answerType: number` and their `unit`, so prompt shows a
+    number input and stores a numeric `value`. Text metrics take a free-text answer.
   - Text: the metric's `prompttext`, or "Goal title: metric name (unit)", then the period ("Sat,
-    Oct 3", "week of Oct 5", "October 2026"). Numeric questions add "Reply with a number."
+    Oct 3", "week of Oct 5", "October 2026"). Text questions add "Reply in your own words."
   - The question is tracked by a `GoalPendingAsk`: `metricid`, `questionid`, `answerid`,
     `periodstart`, `periodend`, `status` (`PendingAskStatusType`: `open`, `answered`, `missed`,
     `invalid`), `note`.
@@ -296,14 +297,15 @@ counts as No.
     token. It records nothing unless that answer belongs to the question and was written by the
     ask's owner.
   - Choice answers use the selected choice. Scale answers use the selected point. Numeric answers use
-    the first number in the text ("about 1,204.5" → 1204.5). Text answers use the text.
+    the answer's `value`, or the first number in the text for answers written before prompt 1.3.0
+    ("about 1,204.5" → 1204.5). Text answers use the text.
   - The value is dated to the start of the asked period. If the period already has a value, the ask
     is closed as answered and nothing is added. Unreadable answers, or values the metric rejects,
     close the ask as `invalid` with a note.
   - The route always answers 200 for events it ignores, so Pub/Sub doesn't retry them.
     `questionOverdue` isn't subscribed; the tick's expiry handles missed periods.
-- **Prompt change (phase 2b, a PR to `prompt`):** add `answerType: text|number`, `unit`, `min` and
-  `max` to Question, so the prompt UI shows a numeric input. Free-text parsing works until then.
+- **Prompt 1.3.0 (phase 2b):** Question has `answerType` (`text` | `number`), `unit`, `minValue` and
+  `maxValue`. Number answers are validated by prompt and carry a numeric `value`.
 - **Profile:** `GoalProfile` (`ownerid`, `timezone`) holds the owner's IANA timezone. The UI saves the
   browser's timezone once per session when it differs, through `PUT /api/profile`. Email and digest
   settings join it in phase 4.

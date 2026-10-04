@@ -177,7 +177,10 @@ class CollectionServiceTest {
         assert prompt.questions.find { it.text.startsWith("Sleep: Routine") }.choices*.value == ["skipped", "done"]
         Map weight = prompt.questions.find { it.text.startsWith("What did the scale say?") }
         assert weight.choices == []
-        assert weight.text == "What did the scale say? — Tue, Feb 9. Reply with a number."
+        assert weight.text == "What did the scale say? — Tue, Feb 9"
+        assert weight.answerType == "number"
+        assert weight.unit == "lb"
+        assert !prompt.questions.find { it.text.startsWith("Sleep: Energy") }.containsKey("answerType")
         assert prompt.questions.size() == 3
     }
 }
