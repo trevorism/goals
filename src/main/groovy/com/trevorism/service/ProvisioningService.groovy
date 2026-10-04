@@ -3,7 +3,6 @@ package com.trevorism.service
 import com.trevorism.https.SecureHttpClient
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
-import io.micronaut.context.annotation.Value
 import jakarta.inject.Named
 import jakarta.inject.Singleton
 
@@ -16,6 +15,7 @@ import java.time.format.DateTimeFormatter
 @Singleton
 class ProvisioningService {
 
+    static final String GOALS_BASE_URL = "https://goals.action.trevorism.com"
     static final String EVENT_BASE_URL = "https://event.data.trevorism.com"
     static final String SCHEDULE_BASE_URL = "https://schedule.action.trevorism.com"
     static final String SUBSCRIPTION_NAME = "goals-question-answered"
@@ -26,13 +26,10 @@ class ProvisioningService {
     static final String EXISTS = "exists"
 
     private final SecureHttpClient client
-    private final String baseUrl
     Clock clock = Clock.systemUTC()
 
-    ProvisioningService(@Named("appClientSecureHttpClient") SecureHttpClient client,
-                        @Value('${goals.base-url:https://goals.action.trevorism.com}') String baseUrl) {
+    ProvisioningService(@Named("appClientSecureHttpClient") SecureHttpClient client) {
         this.client = client
-        this.baseUrl = baseUrl
     }
 
     Map<String, String> provision() {
@@ -47,7 +44,7 @@ class ProvisioningService {
         client.post("${EVENT_BASE_URL}/subscription".toString(), JsonOutput.toJson([
                 name : SUBSCRIPTION_NAME,
                 topic: ANSWERED_TOPIC,
-                url  : "${baseUrl}/api/event/questionAnswered".toString()
+                url  : "${GOALS_BASE_URL}/api/event/questionAnswered".toString()
         ]))
         return CREATED
     }
@@ -62,7 +59,7 @@ class ProvisioningService {
                 type       : "daily",
                 startDate  : nextTickTime(),
                 enabled    : true,
-                endpoint   : "${baseUrl}/api/collect/tick".toString(),
+                endpoint   : "${GOALS_BASE_URL}/api/collect/tick".toString(),
                 httpMethod : "post",
                 requestJson: "{}"
         ]))

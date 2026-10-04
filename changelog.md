@@ -1,3 +1,7 @@
+## 0.6.1
+
+- Fix provisioning: the base URL lost its `https:` because Micronaut reads every `:` in an inline placeholder default as another fallback. The URL is now a constant in code.
+
 ## 0.6.0
 
 - Metrics can be collected through prompt: choose "Ask me in prompt" and goals sends you one private question per day, week or month, with Yes/No, scale or choice buttons, or a text reply for numbers.
