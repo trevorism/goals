@@ -425,6 +425,20 @@ service list.
   goals, metrics, observations or adjustments. The acceptance suite has only one app identity, so
   it covers anonymous rejection and unknown ids. `RouteSecurityTest` fails the build if any data
   route lacks `@Secure(Roles.USER)`.
+- **Delegation:** an owner can let another identity act on their goals: a `GoalDelegate` (`ownerid`,
+  `delegateid`, `label`, `access` from `DelegateAccessType`: `read` | `edit`), managed on the Settings
+  page through `GET/POST /api/delegate` and `DELETE /api/delegate/{id}`.
+  - A delegate adds `?onBehalfOf=<ownerId>` to any goal, metric, observation, adjustment, progress,
+    Today or dashboard route. `OwnerResolver` checks the grant on every request: reads need any grant,
+    creates and updates need `edit`, and **deletes are owner-only**. Anything else is a 403 with a
+    reason, logged.
+  - It's a query parameter because the platform MCP's API tool can't set headers.
+    `GET /api/delegate/granted` tells a delegate whose goals it may act on.
+  - Records created on an owner's behalf store the delegate in `createdby`, and the UI shows
+    "added by Claude" or "by Claude".
+  - Profile and grant routes are owner-only; delegates can't change the timezone or grant access.
+  - Typical use: the owner grants the MCP `agent` identity `edit`, so a Claude session can break goals
+    down and record values into the owner's own goals.
 - **Deletes:** the normal flow is `status=abandoned`, which keeps the history. A hard delete cascades
   through the subtree. It needs only `Roles.USER`, because user tokens carry `CRE` and no `D`;
   ownership is what protects the data.
@@ -475,6 +489,8 @@ alert emails**. Status lives on an in-app dashboard that the owner opens when th
 | `GET /today?date=yyyy-MM-dd` | Metrics with nothing recorded in their current day, week or month, for the caller's local date (phase 1: manual metrics only; missed, invalid and approvals come in phases 2 and 5) |
 | `POST /collect/tick` | Daily tick (SYSTEM or internal) |
 | `POST /collect/provision` | Create the tick schedule and answer subscription (SYSTEM) |
+| `GET/POST /delegate`, `DELETE /delegate/{id}` | The owner's delegates (owner-only) |
+| `GET /delegate/granted` | Owners who granted the caller access; then use `?onBehalfOf=<ownerId>` |
 | `GET/PUT /profile` | The owner's timezone (email and digest settings in phase 4) |
 | `POST /event/questionAnswered`, `/event/questionOverdue`, `/event/approvalDecided`, `/event/topic/{topic}` | Event receivers |
 
@@ -498,9 +514,9 @@ Breakdown happens outside the app, in a Claude session or through the platform M
 against the goals API: `describe_service goals` lists the routes, and `POST /api/goal/{id}/child` plus
 `POST /api/goal/{id}/metric` apply an accepted breakdown. The app has no assisted-decomposition feature.
 
-- The MCP server signs in as its own user (`agent`), and goals are private to their owner. So a
-  breakdown made through MCP lands in `agent`'s goals, not the user's, until the MCP server uses the
-  user's own credentials or goals supports delegated access.
+- The MCP server signs in as its own user (`agent`). Once the owner grants `agent` access on the
+  Settings page, a session reads `GET /api/delegate/granted`, then adds `?onBehalfOf=<ownerId>` to its
+  requests, so its breakdown lands in the owner's goals and is marked as added by the delegate.
 
 ## 12. Delivery plan
 

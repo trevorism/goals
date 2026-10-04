@@ -6,6 +6,7 @@ import com.trevorism.https.AppClientSecureHttpClient
 import com.trevorism.https.SecureHttpClient
 import com.trevorism.model.Goal
 import com.trevorism.model.GoalAdjustment
+import com.trevorism.model.GoalDelegate
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
 import com.trevorism.model.GoalPendingAsk
@@ -46,6 +47,18 @@ class RepositoryFactory {
     @Named("profileStore")
     Repository<GoalProfile> profileStore(@Named("appClientSecureHttpClient") SecureHttpClient secureHttpClient) {
         new FastDatastoreRepository<GoalProfile>(GoalProfile, secureHttpClient)
+    }
+
+    @Singleton
+    @Named("delegateStore")
+    Repository<GoalDelegate> delegateStore(@Named("appClientSecureHttpClient") SecureHttpClient secureHttpClient) {
+        new FastDatastoreRepository<GoalDelegate>(GoalDelegate, secureHttpClient)
+    }
+
+    @Singleton
+    @Named("delegate")
+    OwnedRepository<GoalDelegate> delegateRepository(@Named("delegateStore") Repository<GoalDelegate> store) {
+        new OwnedRepository<GoalDelegate>(store, "Delegate")
     }
 
     @Singleton

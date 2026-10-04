@@ -51,6 +51,12 @@ export async function syncTimezone(storage = window.sessionStorage) {
   return true
 }
 
+export const delegatesApi = {
+  list: () => data(axios.get('/api/delegate')),
+  grant: (delegate) => data(axios.post('/api/delegate', delegate)),
+  revoke: (id) => data(axios.delete(`/api/delegate/${id}`))
+}
+
 export const dashboardApi = {
   get: (date) => data(axios.get('/api/dashboard', { params: { date } }))
 }

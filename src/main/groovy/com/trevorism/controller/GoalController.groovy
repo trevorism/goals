@@ -6,6 +6,7 @@ import com.trevorism.model.progress.TreeProgress
 import com.trevorism.secure.Roles
 import com.trevorism.secure.Secure
 import com.trevorism.service.GoalService
+import com.trevorism.service.OwnerResolver
 import com.trevorism.service.ProgressService
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
@@ -23,6 +24,9 @@ import jakarta.inject.Inject
 class GoalController {
 
     @Inject
+    OwnerResolver owners
+
+    @Inject
     GoalService goalService
 
     @Inject
@@ -33,7 +37,7 @@ class GoalController {
     @Get(value = "/", produces = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     List<Goal> listRoots(Authentication authentication) {
-        goalService.listRoots(RequesterIdentity.of(authentication))
+        goalService.listRoots(owners.ownerFor(authentication))
     }
 
     @Tag(name = "Goal Operations")
@@ -41,7 +45,7 @@ class GoalController {
     @Post(value = "/", produces = MediaType.APPLICATION_JSON, consumes = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     Goal createRoot(@Body Goal goal, Authentication authentication) {
-        goalService.createRoot(RequesterIdentity.of(authentication), goal)
+        goalService.createRoot(owners.ownerFor(authentication), goal)
     }
 
     @Tag(name = "Goal Operations")
@@ -49,7 +53,7 @@ class GoalController {
     @Get(value = "{id}", produces = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     Goal get(String id, Authentication authentication) {
-        goalService.get(RequesterIdentity.of(authentication), id)
+        goalService.get(owners.ownerFor(authentication), id)
     }
 
     @Tag(name = "Goal Operations")
@@ -57,7 +61,7 @@ class GoalController {
     @Put(value = "{id}", produces = MediaType.APPLICATION_JSON, consumes = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     Goal update(String id, @Body Goal goal, Authentication authentication) {
-        goalService.update(RequesterIdentity.of(authentication), id, goal)
+        goalService.update(owners.ownerFor(authentication), id, goal)
     }
 
     @Tag(name = "Goal Operations")
@@ -65,7 +69,7 @@ class GoalController {
     @Delete(value = "{id}", produces = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     Goal delete(String id, Authentication authentication) {
-        goalService.delete(RequesterIdentity.of(authentication), id)
+        goalService.delete(owners.ownerFor(authentication), id)
     }
 
     @Tag(name = "Goal Operations")
@@ -73,7 +77,7 @@ class GoalController {
     @Post(value = "{id}/child", produces = MediaType.APPLICATION_JSON, consumes = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     Goal createChild(String id, @Body Goal goal, Authentication authentication) {
-        goalService.createChild(RequesterIdentity.of(authentication), id, goal)
+        goalService.createChild(owners.ownerFor(authentication), id, goal)
     }
 
     @Tag(name = "Goal Operations")
@@ -81,7 +85,7 @@ class GoalController {
     @Get(value = "{id}/tree", produces = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     GoalTreeNode tree(String id, Authentication authentication) {
-        goalService.tree(RequesterIdentity.of(authentication), id)
+        goalService.tree(owners.ownerFor(authentication), id)
     }
 
     @Tag(name = "Goal Operations")
@@ -89,6 +93,6 @@ class GoalController {
     @Get(value = "{id}/progress", produces = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     TreeProgress progress(String id, Authentication authentication) {
-        progressService.progress(RequesterIdentity.of(authentication), id)
+        progressService.progress(owners.ownerFor(authentication), id)
     }
 }

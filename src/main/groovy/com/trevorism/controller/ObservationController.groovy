@@ -4,6 +4,7 @@ import com.trevorism.model.GoalObservation
 import com.trevorism.secure.Roles
 import com.trevorism.secure.Secure
 import com.trevorism.service.ObservationService
+import com.trevorism.service.OwnerResolver
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -20,6 +21,9 @@ import jakarta.inject.Inject
 class ObservationController {
 
     @Inject
+    OwnerResolver owners
+
+    @Inject
     ObservationService observationService
 
     @Tag(name = "Observation Operations")
@@ -27,7 +31,7 @@ class ObservationController {
     @Get(value = "/metric/{metricId}/observation", produces = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     List<GoalObservation> listForMetric(String metricId, Authentication authentication) {
-        observationService.listForMetric(RequesterIdentity.of(authentication), metricId)
+        observationService.listForMetric(owners.ownerFor(authentication), metricId)
     }
 
     @Tag(name = "Observation Operations")
@@ -35,7 +39,7 @@ class ObservationController {
     @Post(value = "/metric/{metricId}/observation", produces = MediaType.APPLICATION_JSON, consumes = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     GoalObservation create(String metricId, @Body GoalObservation observation, Authentication authentication) {
-        observationService.create(RequesterIdentity.of(authentication), metricId, observation)
+        observationService.create(owners.ownerFor(authentication), metricId, observation)
     }
 
     @Tag(name = "Observation Operations")
@@ -43,7 +47,7 @@ class ObservationController {
     @Put(value = "/observation/{id}", produces = MediaType.APPLICATION_JSON, consumes = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     GoalObservation update(String id, @Body GoalObservation observation, Authentication authentication) {
-        observationService.update(RequesterIdentity.of(authentication), id, observation)
+        observationService.update(owners.ownerFor(authentication), id, observation)
     }
 
     @Tag(name = "Observation Operations")
@@ -51,6 +55,6 @@ class ObservationController {
     @Delete(value = "/observation/{id}", produces = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     GoalObservation delete(String id, Authentication authentication) {
-        observationService.delete(RequesterIdentity.of(authentication), id)
+        observationService.delete(owners.ownerFor(authentication), id)
     }
 }

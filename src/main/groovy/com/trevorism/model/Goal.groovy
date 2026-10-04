@@ -14,6 +14,7 @@ class Goal implements Owned {
     Date endDate
     String definitionOfDone
 
+    String createdBy
     Date createdDate
     Date completedDate
 

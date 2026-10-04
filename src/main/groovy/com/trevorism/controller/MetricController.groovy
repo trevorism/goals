@@ -4,6 +4,7 @@ import com.trevorism.model.GoalMetric
 import com.trevorism.secure.Roles
 import com.trevorism.secure.Secure
 import com.trevorism.service.MetricService
+import com.trevorism.service.OwnerResolver
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -20,6 +21,9 @@ import jakarta.inject.Inject
 class MetricController {
 
     @Inject
+    OwnerResolver owners
+
+    @Inject
     MetricService metricService
 
     @Tag(name = "Metric Operations")
@@ -27,7 +31,7 @@ class MetricController {
     @Get(value = "/goal/{goalId}/metric", produces = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     List<GoalMetric> listForGoal(String goalId, Authentication authentication) {
-        metricService.listForGoal(RequesterIdentity.of(authentication), goalId)
+        metricService.listForGoal(owners.ownerFor(authentication), goalId)
     }
 
     @Tag(name = "Metric Operations")
@@ -35,7 +39,7 @@ class MetricController {
     @Post(value = "/goal/{goalId}/metric", produces = MediaType.APPLICATION_JSON, consumes = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     GoalMetric create(String goalId, @Body GoalMetric metric, Authentication authentication) {
-        metricService.create(RequesterIdentity.of(authentication), goalId, metric)
+        metricService.create(owners.ownerFor(authentication), goalId, metric)
     }
 
     @Tag(name = "Metric Operations")
@@ -43,7 +47,7 @@ class MetricController {
     @Get(value = "/metric/{id}", produces = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     GoalMetric get(String id, Authentication authentication) {
-        metricService.get(RequesterIdentity.of(authentication), id)
+        metricService.get(owners.ownerFor(authentication), id)
     }
 
     @Tag(name = "Metric Operations")
@@ -51,7 +55,7 @@ class MetricController {
     @Put(value = "/metric/{id}", produces = MediaType.APPLICATION_JSON, consumes = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     GoalMetric update(String id, @Body GoalMetric metric, Authentication authentication) {
-        metricService.update(RequesterIdentity.of(authentication), id, metric)
+        metricService.update(owners.ownerFor(authentication), id, metric)
     }
 
     @Tag(name = "Metric Operations")
@@ -59,6 +63,6 @@ class MetricController {
     @Delete(value = "/metric/{id}", produces = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     GoalMetric delete(String id, Authentication authentication) {
-        metricService.delete(RequesterIdentity.of(authentication), id)
+        metricService.delete(owners.ownerFor(authentication), id)
     }
 }

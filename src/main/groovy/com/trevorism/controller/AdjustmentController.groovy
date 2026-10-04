@@ -4,6 +4,7 @@ import com.trevorism.model.GoalAdjustment
 import com.trevorism.secure.Roles
 import com.trevorism.secure.Secure
 import com.trevorism.service.AdjustmentService
+import com.trevorism.service.OwnerResolver
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -20,6 +21,9 @@ import jakarta.inject.Inject
 class AdjustmentController {
 
     @Inject
+    OwnerResolver owners
+
+    @Inject
     AdjustmentService adjustmentService
 
     @Tag(name = "Adjustment Operations")
@@ -27,7 +31,7 @@ class AdjustmentController {
     @Get(value = "/goal/{goalId}/adjustment", produces = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     List<GoalAdjustment> listForGoal(String goalId, Authentication authentication) {
-        adjustmentService.listForGoal(RequesterIdentity.of(authentication), goalId)
+        adjustmentService.listForGoal(owners.ownerFor(authentication), goalId)
     }
 
     @Tag(name = "Adjustment Operations")
@@ -35,7 +39,7 @@ class AdjustmentController {
     @Post(value = "/goal/{goalId}/adjustment", produces = MediaType.APPLICATION_JSON, consumes = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     GoalAdjustment create(String goalId, @Body GoalAdjustment adjustment, Authentication authentication) {
-        adjustmentService.create(RequesterIdentity.of(authentication), goalId, adjustment)
+        adjustmentService.create(owners.ownerFor(authentication), goalId, adjustment)
     }
 
     @Tag(name = "Adjustment Operations")
@@ -43,7 +47,7 @@ class AdjustmentController {
     @Put(value = "/adjustment/{id}", produces = MediaType.APPLICATION_JSON, consumes = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     GoalAdjustment update(String id, @Body GoalAdjustment adjustment, Authentication authentication) {
-        adjustmentService.update(RequesterIdentity.of(authentication), id, adjustment)
+        adjustmentService.update(owners.ownerFor(authentication), id, adjustment)
     }
 
     @Tag(name = "Adjustment Operations")
@@ -51,6 +55,6 @@ class AdjustmentController {
     @Delete(value = "/adjustment/{id}", produces = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     GoalAdjustment delete(String id, Authentication authentication) {
-        adjustmentService.delete(RequesterIdentity.of(authentication), id)
+        adjustmentService.delete(owners.ownerFor(authentication), id)
     }
 }

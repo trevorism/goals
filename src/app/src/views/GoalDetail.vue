@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { errorMessage, goalsApi, metricsApi } from '../api.js'
+import { delegatesApi, errorMessage, goalsApi, metricsApi } from '../api.js'
 import { findNode, formatDay } from '../forms.js'
 import { formatPercent, progressById } from '../progress.js'
 import { GoalStatusType } from '../types.js'
@@ -21,6 +21,7 @@ const props = defineProps({
 const router = useRouter()
 const tree = ref(null)
 const progress = ref(null)
+const delegateLabels = ref({})
 const selectedId = ref(props.id)
 const mode = ref('view')
 const saving = ref(false)
@@ -39,6 +40,14 @@ const headlineExpected = computed(() => {
 const parentGoal = computed(() => (selectedGoal.value?.parentId ? findNode(tree.value, selectedGoal.value.parentId)?.goal ?? null : null))
 const outcomeIsHeadline = computed(() => selectedProgress.value?.outcomeProgress != null)
 
+async function loadDelegates() {
+  try {
+    delegateLabels.value = Object.fromEntries((await delegatesApi.list()).map((delegate) => [delegate.delegateId, delegate.label]))
+  } catch (e) {
+    delegateLabels.value = {}
+  }
+}
+
 async function loadProgress() {
   try {
     progress.value = await goalsApi.progress(props.id)
@@ -49,7 +58,7 @@ async function loadProgress() {
 
 async function load() {
   try {
-    const [loadedTree] = await Promise.all([goalsApi.tree(props.id), loadProgress()])
+    const [loadedTree] = await Promise.all([goalsApi.tree(props.id), loadProgress(), loadDelegates()])
     tree.value = loadedTree
     if (!findNode(tree.value, selectedId.value)) {
       selectedId.value = tree.value.goal.id
@@ -150,7 +159,10 @@ onMounted(load)
                 <h1 class="goal-title text-2xl font-semibold">{{ selectedGoal.title }}</h1>
                 <status-chip :status="selectedGoal.status" />
               </div>
-              <p class="text-sm text-slate-500">{{ formatDay(selectedGoal.startDate) }} – {{ formatDay(selectedGoal.endDate) }}</p>
+              <p class="text-sm text-slate-500">
+                {{ formatDay(selectedGoal.startDate) }} – {{ formatDay(selectedGoal.endDate) }}
+                <span v-if="selectedGoal.createdBy" class="created-by"> · added by {{ delegateLabels[selectedGoal.createdBy] ?? 'a delegate' }}</span>
+              </p>
               <div v-if="selectedProgress" class="goal-progress flex flex-col gap-3 rounded border border-slate-200 p-3">
                 <div class="flex flex-wrap items-center gap-3">
                   <progress-status :status="selectedProgress.status" />
@@ -238,6 +250,7 @@ onMounted(load)
             :metric-progress="progressMaps.metrics[metric.id] ?? null"
             :now="progress?.asOf ?? null"
             :segments="progressMaps.segments[metric.id] ?? []"
+            :delegate-labels="delegateLabels"
             @changed="load"
             @recorded="loadProgress"
           />

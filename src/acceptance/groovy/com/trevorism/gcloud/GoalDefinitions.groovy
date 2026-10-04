@@ -31,6 +31,36 @@ Then(~/^the dashboard shows the root goal with its progress$/) { ->
     assert dashboard.asOf
 }
 
+When(~/^I give "(.*)" (read|edit) access to my goals$/) { String delegateId, String access ->
+    grantDelegate(delegateId, access)
+}
+
+Then(~/^"(.*)" is listed as a delegate with (read|edit) access$/) { String delegateId, String access ->
+    Map listed = fetchDelegates().find { it.delegateId == delegateId }
+    assert listed
+    assert listed.access == access
+}
+
+When(~/^I revoke that access$/) { ->
+    revokeDelegate()
+}
+
+Then(~/^"(.*)" is no longer a delegate$/) { String delegateId ->
+    assert !fetchDelegates().any { it.delegateId == delegateId }
+}
+
+When(~/^I list goals on behalf of "(.*)"$/) { String ownerId ->
+    attemptAuthenticatedGet("api/goal?onBehalfOf=${ownerId}")
+}
+
+When(~/^I list the owners who granted me access$/) { ->
+    attemptAuthenticatedGet("api/delegate/granted")
+}
+
+Then(~/^the request succeeds$/) { ->
+    assert !rejected
+}
+
 When(~/^I read my profile$/) { ->
     fetchProfile()
 }

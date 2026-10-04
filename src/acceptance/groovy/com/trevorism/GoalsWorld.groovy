@@ -19,6 +19,7 @@ class GoalsWorld {
     private final HttpClient anonClient = new JsonHttpClient()
 
     final List<String> createdRootIds = []
+    final List<String> createdDelegateIds = []
 
     boolean rejected
     Map root
@@ -33,6 +34,7 @@ class GoalsWorld {
     Map profile
     Map eventOutcome
     Map dashboard
+    Map delegate
 
     Map createRoot() {
         root = postJson("api/goal", [title: "${MARKER} root goal".toString(), startDate: daysFromToday(-2), endDate: daysFromToday(180)])
@@ -74,6 +76,21 @@ class GoalsWorld {
 
     static String daysFromToday(int days) {
         LocalDate.now(ZoneOffset.UTC).plusDays(days).toString()
+    }
+
+    Map grantDelegate(String delegateId, String access) {
+        delegate = postJson("api/delegate", [delegateId: delegateId, label: "${MARKER} delegate".toString(), access: access])
+        createdDelegateIds << (delegate.id as String)
+        return delegate
+    }
+
+    List fetchDelegates() {
+        gson.fromJson(authClient.get("${BASE_URL}/api/delegate".toString()), List)
+    }
+
+    void revokeDelegate() {
+        authClient.delete("${BASE_URL}/api/delegate/${delegate.id}".toString())
+        createdDelegateIds.remove(delegate.id as String)
     }
 
     Map fetchDashboard() {
@@ -159,6 +176,8 @@ class GoalsWorld {
     }
 
     void cleanup() {
+        createdDelegateIds.each { String id -> try { authClient.delete("${BASE_URL}/api/delegate/${id}".toString()) } catch (ignored) {} }
+        createdDelegateIds.clear()
         createdRootIds.each { String id -> try { authClient.delete("${BASE_URL}/api/goal/${id}".toString()) } catch (ignored) {} }
         createdRootIds.clear()
     }
