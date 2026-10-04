@@ -67,7 +67,7 @@ class TodayService {
                 periodStart: Date.from(period.atStartOfDay(ZoneOffset.UTC).toInstant()))
     }
 
-    private static LocalDate parseDay(String date) {
+    static LocalDate parseDay(String date) {
         if (!date) {
             return LocalDate.now(ZoneOffset.UTC)
         }

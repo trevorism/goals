@@ -376,6 +376,37 @@ export function describeScore(metric, score) {
   return `${formatPercent(score)} of the way to target`
 }
 
+export function describeHeadline(row) {
+  const metric = row.headlineMetric
+  const metricProgress = row.headlineMetricProgress
+  if (!metric || !metricProgress) {
+    const effort = row.progress?.effortProgress
+    return effort !== null && effort !== undefined ? `${formatPercent(effort)} of sub-goals and habits on track` : 'Add a metric with a target to track this goal'
+  }
+  if (metric.type === MetricType.BOOLEAN && metricProgress.adherence !== null && metricProgress.adherence !== undefined) {
+    const target = metric.target !== null && metric.target !== undefined ? ` (target ${formatPercent(metric.target)})` : ''
+    return `${metric.name}: ${formatPercent(metricProgress.adherence)} yes${target}`
+  }
+  if (metricProgress.projectedEnd !== null && metricProgress.projectedEnd !== undefined) {
+    const target = metric.target !== null && metric.target !== undefined ? ` (target ${withUnit(metric, metric.target)})` : ''
+    return `${metric.name}: on this trend, ${withUnit(metric, metricProgress.projectedEnd)} by ${formatDay(row.goal.endDate)}${target}`
+  }
+  return `${metric.name}: ${describeScore(metric, metricProgress.score)}`
+}
+
+export function describeNeedsYou(item) {
+  switch (item.type) {
+    case 'unreadable_answer':
+      return `Couldn\u2019t record \u201c${item.title}\u201d for ${formatDay(item.date)}${item.detail ? `: ${item.detail}` : ''}`
+    case 'missed_questions':
+      return `\u201c${item.title}\u201d: ${item.count} questions in a row went unanswered`
+    case 'past_end_date':
+      return `\u201c${item.title}\u201d ended ${formatDay(item.date)} but is still active`
+    default:
+      return item.title
+  }
+}
+
 export function describeMetricProgress(metric, metricProgress) {
   if (!metricProgress) {
     return []

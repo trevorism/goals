@@ -32,6 +32,7 @@ class GoalsWorld {
     List todayItems
     Map profile
     Map eventOutcome
+    Map dashboard
 
     Map createRoot() {
         root = postJson("api/goal", [title: "${MARKER} root goal".toString(), startDate: daysFromToday(-2), endDate: daysFromToday(180)])
@@ -73,6 +74,10 @@ class GoalsWorld {
 
     static String daysFromToday(int days) {
         LocalDate.now(ZoneOffset.UTC).plusDays(days).toString()
+    }
+
+    Map fetchDashboard() {
+        dashboard = getJson("api/dashboard?date=${today()}")
     }
 
     Map fetchProfile() {

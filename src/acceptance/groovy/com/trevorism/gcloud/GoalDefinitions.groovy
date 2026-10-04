@@ -21,6 +21,16 @@ When(~/^I POST "(.*)" anonymously$/) { String path ->
     anonPost(path, [:])
 }
 
+Then(~/^the dashboard shows the root goal with its progress$/) { ->
+    fetchDashboard()
+    Map row = dashboard.goals.find { it.goal.id == root.id }
+    assert row
+    assert row.progress.goalId == root.id
+    assert row.progress.status
+    assert dashboard.needsYou != null
+    assert dashboard.asOf
+}
+
 When(~/^I read my profile$/) { ->
     fetchProfile()
 }

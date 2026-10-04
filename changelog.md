@@ -1,3 +1,9 @@
+## 0.8.0
+
+- The home page is now a quiet dashboard. Each goal shows its status, progress against the plan, time elapsed, and one headline, such as the projected end value of its most concerning metric or the share of Yes answers for a habit.
+- A "Needs you" strip appears only when something is stuck: an answer goals couldn't record, three or more unanswered prompt questions in a row, or an active goal past its end date.
+- New route `GET /api/dashboard`.
+
 ## 0.7.0
 
 - Numeric metrics are asked in prompt as number questions with their unit, so you answer in a number input instead of free text. Answers use prompt's numeric value. Needs prompt 1.3.0.
