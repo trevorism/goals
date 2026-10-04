@@ -4,6 +4,7 @@ import com.trevorism.model.dashboard.Dashboard
 import com.trevorism.secure.Roles
 import com.trevorism.secure.Secure
 import com.trevorism.service.DashboardService
+import com.trevorism.service.OwnerResolver
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
@@ -18,6 +19,9 @@ import jakarta.inject.Inject
 class DashboardController {
 
     @Inject
+    OwnerResolver owners
+
+    @Inject
     DashboardService dashboardService
 
     @Tag(name = "Dashboard Operations")
@@ -25,6 +29,6 @@ class DashboardController {
     @Get(value = "/{?date}", produces = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     Dashboard dashboard(@Nullable @QueryValue String date, Authentication authentication) {
-        dashboardService.dashboard(RequesterIdentity.of(authentication), date)
+        dashboardService.dashboard(owners.ownerFor(authentication), date)
     }
 }

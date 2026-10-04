@@ -12,5 +12,6 @@ class GoalAdjustment implements Owned {
     String description
     String category
 
+    String createdBy
     Date createdDate
 }

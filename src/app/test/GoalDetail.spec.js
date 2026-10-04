@@ -227,4 +227,16 @@ describe('GoalDetail', () => {
     expect(axios.post).toHaveBeenCalledWith('/api/goal/cardio/adjustment', expect.objectContaining({ title: 'Bought a bike' }))
     expect(axios.get.mock.calls.filter(([url]) => url === '/api/goal/root/progress')).toHaveLength(2)
   })
+
+  it('says which delegate added a goal', async () => {
+    axios.get.mockImplementation((url) => {
+      if (url === '/api/goal/root/tree') return Promise.resolve({ data: { ...tree, goal: { ...tree.goal, createdBy: '4856675479584768' } } })
+      if (url === '/api/delegate') return Promise.resolve({ data: [{ id: 'd1', delegateId: '4856675479584768', label: 'Claude', access: 'edit' }] })
+      return Promise.resolve({ data: [] })
+    })
+
+    const wrapper = await mountDetail()
+
+    expect(wrapper.find('.created-by').text()).toBe('· added by Claude')
+  })
 })

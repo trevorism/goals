@@ -9,12 +9,15 @@ import com.trevorism.model.Owned
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.exceptions.HttpStatusException
 
+import java.util.function.Supplier
+
 class OwnedRepository<T extends Owned> {
 
     static final String OWNER_FIELD = "ownerId"
 
     private final Repository<T> repository
     private final String entityName
+    Supplier<String> currentDelegate = { OwnerResolver.currentDelegate() } as Supplier<String>
 
     OwnedRepository(Repository<T> repository, String entityName) {
         this.repository = repository
@@ -43,6 +46,9 @@ class OwnedRepository<T extends Owned> {
         requireOwner(ownerId)
         item.id = null
         item.ownerId = ownerId
+        if (item.hasProperty("createdBy")) {
+            item.createdBy = currentDelegate.get()
+        }
         repository.create(item)
     }
 

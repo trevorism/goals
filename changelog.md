@@ -1,3 +1,9 @@
+## 0.9.0
+
+- Delegation: on the new Settings page, give another identity (such as the Claude MCP `agent`) read or read-and-edit access to your goals. It acts for you by adding `?onBehalfOf=<your id>` to its requests. Delegates can never delete, and you can revoke access at any time.
+- Goals and values a delegate creates show who added them.
+- New routes: `GET/POST /api/delegate`, `DELETE /api/delegate/{id}`, `GET /api/delegate/granted`.
+
 ## 0.8.1
 
 - Errors now show the real reason instead of "Bad Request", e.g. "A sub-goal's dates must fall within its parent's: Oct 3, 2026 – Nov 7, 2026".

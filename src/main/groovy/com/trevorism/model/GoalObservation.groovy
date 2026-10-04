@@ -15,5 +15,6 @@ class GoalObservation implements Owned {
     String sourceRef
     Boolean missed
 
+    String createdBy
     Date createdDate
 }

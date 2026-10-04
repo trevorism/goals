@@ -16,7 +16,8 @@ const props = defineProps({
   goal: { type: Object, required: true },
   metricProgress: { type: Object, default: null },
   now: { type: [Date, String], default: null },
-  segments: { type: Array, default: () => [] }
+  segments: { type: Array, default: () => [] },
+  delegateLabels: { type: Object, default: () => ({}) }
 })
 
 const emit = defineEmits(['changed', 'recorded'])
@@ -129,6 +130,7 @@ onMounted(loadObservations)
             <span class="observation-value flex-1">
               {{ describeObservation(metric, observation) }}
               <span v-if="observation.note" class="text-slate-500"> — {{ observation.note }}</span>
+              <span v-if="observation.createdBy" class="observation-by text-xs text-slate-500"> · by {{ delegateLabels[observation.createdBy] ?? 'a delegate' }}</span>
             </span>
             <va-button preset="plain" size="small" color="danger" @click="removeObservation(observation)">Delete</va-button>
           </li>

@@ -28,5 +28,6 @@ class GoalMetric implements Owned {
     Date lastObservedAt
     Boolean enabled
 
+    String createdBy
     Date createdDate
 }

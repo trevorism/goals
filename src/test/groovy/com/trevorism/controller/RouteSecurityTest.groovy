@@ -14,7 +14,7 @@ import java.lang.reflect.Method
 class RouteSecurityTest {
 
     private static final List<Class> ROUTE_ANNOTATIONS = [Get, Post, Put, Patch, Delete]
-    private static final List<Class> USER_CONTROLLERS = [GoalController, MetricController, ObservationController, AdjustmentController, TodayController, ProfileController, DashboardController]
+    private static final List<Class> USER_CONTROLLERS = [GoalController, MetricController, ObservationController, AdjustmentController, TodayController, ProfileController, DashboardController, DelegateController]
 
     private static List<Method> routesOf(Class controller) {
         controller.declaredMethods.findAll { Method method -> ROUTE_ANNOTATIONS.any { method.isAnnotationPresent(it) } }
@@ -24,13 +24,22 @@ class RouteSecurityTest {
     void testEveryUserDataRouteRequiresAUserAndRejectsInternalTokens() {
         List<Method> routes = USER_CONTROLLERS.collectMany { routesOf(it) }
 
-        assert routes.size() == 25
+        assert routes.size() == 29
         routes.each { Method route ->
             Secure secure = route.getAnnotation(Secure)
             assert secure, "${route.declaringClass.simpleName}.${route.name} has no @Secure"
             assert secure.value() == Roles.USER
             assert !secure.allowInternal()
         }
+    }
+
+    @Test
+    void testDataControllersResolveTheOwnerThroughDelegationAndOthersDoNot() {
+        List<Class> delegable = [GoalController, MetricController, ObservationController, AdjustmentController, TodayController, DashboardController]
+        List<Class> ownerOnly = [ProfileController, DelegateController]
+
+        delegable.each { assert it.declaredFields*.type.contains(com.trevorism.service.OwnerResolver), "${it.simpleName} must use OwnerResolver" }
+        ownerOnly.each { assert !it.declaredFields*.type.contains(com.trevorism.service.OwnerResolver), "${it.simpleName} must stay owner-only" }
     }
 
     @Test

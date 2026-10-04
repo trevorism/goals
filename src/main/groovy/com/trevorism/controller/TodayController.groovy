@@ -3,6 +3,7 @@ package com.trevorism.controller
 import com.trevorism.model.today.TodayItem
 import com.trevorism.secure.Roles
 import com.trevorism.secure.Secure
+import com.trevorism.service.OwnerResolver
 import com.trevorism.service.TodayService
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.http.MediaType
@@ -18,6 +19,9 @@ import jakarta.inject.Inject
 class TodayController {
 
     @Inject
+    OwnerResolver owners
+
+    @Inject
     TodayService todayService
 
     @Tag(name = "Today Operations")
@@ -25,6 +29,6 @@ class TodayController {
     @Get(value = "/{?date}", produces = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     List<TodayItem> due(@Nullable @QueryValue String date, Authentication authentication) {
-        todayService.due(RequesterIdentity.of(authentication), date)
+        todayService.due(owners.ownerFor(authentication), date)
     }
 }
