@@ -46,9 +46,8 @@ class OwnedRepository<T extends Owned> {
         requireOwner(ownerId)
         item.id = null
         item.ownerId = ownerId
-        String delegate = currentDelegate.get()
-        if (delegate && item.hasProperty("createdBy")) {
-            item.createdBy = delegate
+        if (item.hasProperty("createdBy")) {
+            item.createdBy = currentDelegate.get()
         }
         repository.create(item)
     }

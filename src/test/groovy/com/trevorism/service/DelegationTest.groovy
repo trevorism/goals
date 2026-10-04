@@ -71,7 +71,9 @@ class DelegationTest {
         store.goalRepository.currentDelegate = { AGENT } as java.util.function.Supplier<String>
         Goal delegated = goals.createRoot(resolver.resolve(AGENT, HttpMethod.POST, OWNER), rootGoal("By Claude"))
         store.goalRepository.currentDelegate = { null } as java.util.function.Supplier<String>
-        Goal own = goals.createRoot(resolver.resolve(OWNER, HttpMethod.POST, null), rootGoal("By me"))
+        Goal ownGoal = rootGoal("By me")
+        ownGoal.createdBy = AGENT
+        Goal own = goals.createRoot(resolver.resolve(OWNER, HttpMethod.POST, null), ownGoal)
 
         assert delegated.ownerId == OWNER
         assert delegated.createdBy == AGENT
