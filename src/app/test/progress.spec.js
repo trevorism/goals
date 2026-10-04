@@ -7,6 +7,7 @@ import {
   describeMetricProgress,
   describeScore,
   describeSegments,
+  describeHeadline,
   adjustmentMarkers,
   formatPercent,
   periodOf,
@@ -216,5 +217,19 @@ describe('adjustments', () => {
   it('adds markers to the adherence chart too', () => {
     const chart = buildAdherenceChart({ type: 'boolean', frequency: 'daily' }, goal, [], now, segments)
     expect(chart.options.plugins.annotation.annotations['adjustment-a']).toBeDefined()
+  })
+})
+
+describe('dashboard headline', () => {
+  const goalRow = (metric, metricProgress, progress = {}) => ({ goal: { endDate: day(100) }, progress, headlineMetric: metric, headlineMetricProgress: metricProgress })
+
+  it('describes a habit headline by its share of yes answers', () => {
+    expect(describeHeadline(goalRow({ name: 'Walked', type: 'boolean', target: 0.85 }, { adherence: 0.7, score: 0.82 }))).toBe('Walked: 70% yes (target 85%)')
+  })
+
+  it('falls back to the score, then to effort, then to a hint', () => {
+    expect(describeHeadline(goalRow({ name: 'Energy', type: 'scale', direction: 'increase' }, { score: 0.5 }))).toBe('Energy: 50% of the way to target')
+    expect(describeHeadline(goalRow(null, null, { effortProgress: 0.4 }))).toBe('40% of sub-goals and habits on track')
+    expect(describeHeadline(goalRow(null, null, {}))).toBe('Add a metric with a target to track this goal')
   })
 })

@@ -429,20 +429,30 @@ service list.
   through the subtree. It needs only `Roles.USER`, because user tokens carry `CRE` and no `D`;
   ownership is what protects the data.
 
-## 10. Notifications
+## 10. Notifications and the dashboard
 
-- Notifications are sent with `email POST /mail {subject, recipients:[profile.email], body}`.
-- **Weekly digest** (on `profile.digestday`): one email per user. The format follows your email
-  style: ranked lines you can act on, with no explanatory prose.
-  1. Items due or missed.
-  2. Goals at risk or behind, each with its projection.
-  3. Approvals waiting.
-  4. Wins: steps done and streaks.
-- **Off-track email:** sent once when a goal's status changes to `behind` or `at risk`, and not again
-  until the status changes.
-- **Events published** with `event-client`: `goalCreated`, `goalStatusChanged`, `goalAchieved`,
-  `stepCompleted` and `automationRun`. Other apps can use them, and they can feed event-sourced
-  metrics in other goals.
+Goals run quietly in the background: long-term goals are a "nice to know", so there are **no digest or
+alert emails**. Status lives on an in-app dashboard that the owner opens when they want to.
+
+- **Dashboard** (the home page, `GET /api/dashboard?date=yyyy-MM-dd`): one row per root goal. Each row
+  shows the status, progress with the plan marker, time elapsed, and one headline line.
+  - The headline comes from the root's most concerning scored outcome metric (the lowest pace). For
+    numbers it's the projected end value, for habits the share of Yes answers. Without a metric, it
+    shows effort progress or a hint to add a metric.
+  - Active goals come first, ordered by end date. Closed goals are a short list at the bottom.
+- **Needs you:** a strip that appears only when something is stuck (`NeedsYouType`):
+  - `unreadable_answer`: a prompt answer goals couldn't record, until a value is recorded for that
+    period;
+  - `missed_questions`: a prompt metric whose 3 most recent questions or more all went unanswered;
+  - `past_end_date`: an active goal or sub-goal whose end date has passed.
+
+  Closed goals never show up here.
+- **Later, opt-in per goal:** an attention setting, quiet (the default) or nudge. Nudge is for
+  exceptions such as a blocker, or the one manual step left when everything else is automated; it
+  would reach the owner through prompt or email. It arrives with the automation ladder (phase 5), when
+  that step becomes detectable.
+- **Goal events** (`goalStatusChanged`, `goalAchieved`, `stepCompleted`) wait until something consumes
+  them.
 
 ## 11. API and UI
 
@@ -461,6 +471,7 @@ service list.
 | `POST /goal/{id}/decompose` | Propose children (section 11.3); persists nothing |
 | `POST /goal/{id}/decompose/accept` | Create the accepted children |
 | `PUT /goal/{id}/automation`, `GET /goal/{id}/automation/run` | Automation settings and run log |
+| `GET /dashboard?date=yyyy-MM-dd` | Every root goal's status and headline, plus needs-you items |
 | `GET /today?date=yyyy-MM-dd` | Metrics with nothing recorded in their current day, week or month, for the caller's local date (phase 1: manual metrics only; missed, invalid and approvals come in phases 2 and 5) |
 | `POST /collect/tick` | Daily tick (SYSTEM or internal) |
 | `POST /collect/provision` | Create the tick schedule and answer subscription (SYSTEM) |
@@ -481,19 +492,15 @@ service list.
   run log.
 - **Profile:** timezone, digest day and notification toggles.
 
-### 11.3 Assisted decomposition (phase 3)
-- `POST /goal/{id}/decompose {guidance?}` builds the context: the node, its ancestors, its existing
-  children and siblings, its metrics with their current status, and its adjustments.
-- It calls `chat POST /api/chat` with a Claude model, asking for JSON in a fixed schema:
-  `[{title, description, kind, definitionofdone, startdate, enddate, weight, metrics:[...],
-  suggestedautomation:{level, actionid?}}]`.
-- The server validates the response against the schema and the parent's date range, then returns it.
-  It persists nothing until the user accepts.
-- **Concreteness check:** a child that can be done within about 7 days, has a definition of done,
-  and has a metric or a done state is proposed as a `step`. Otherwise it is a `milestone` and gets a
-  "Decompose further" button.
-- Repeating this on each child is how goals get broken down iteratively: outcome → milestones →
-  steps.
+### 11.3 Breaking goals down (outside the app)
+
+Breakdown happens outside the app, in a Claude session or through the platform MCP tools working
+against the goals API: `describe_service goals` lists the routes, and `POST /api/goal/{id}/child` plus
+`POST /api/goal/{id}/metric` apply an accepted breakdown. The app has no assisted-decomposition feature.
+
+- The MCP server signs in as its own user (`agent`), and goals are private to their owner. So a
+  breakdown made through MCP lands in `agent`'s goals, not the user's, until the MCP server uses the
+  user's own credentials or goals supports delegated access.
 
 ## 12. Delivery plan
 
@@ -516,10 +523,10 @@ tests in its PR environment.
 - **Done when** healthspan habits are answered through prompt and appear on the charts without being
   entered by hand.
 
-**Phase 3: assisted decomposition** through `chat`.
+**Phase 3: dropped.** Breakdown happens outside the app (section 11.3).
 - **Done when** "Get paying customers" has been broken down to steps with assistance.
 
-**Phase 4: notifications**: the weekly digest, off-track emails and goal events.
+**Phase 4: quiet dashboard** (section 10): the home page shows every goal's status, and a needs-you strip appears only when something is stuck. No emails.
 
 **Phase 5: automation ladder**
 - 5a. `measured`: the `http`, `aggregation` and `event` sources, and the action catalog's read

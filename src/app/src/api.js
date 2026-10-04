@@ -51,6 +51,10 @@ export async function syncTimezone(storage = window.sessionStorage) {
   return true
 }
 
+export const dashboardApi = {
+  get: (date) => data(axios.get('/api/dashboard', { params: { date } }))
+}
+
 export const todayApi = {
   due: (date) => data(axios.get('/api/today', { params: { date } }))
 }

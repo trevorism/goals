@@ -14,7 +14,7 @@ import java.lang.reflect.Method
 class RouteSecurityTest {
 
     private static final List<Class> ROUTE_ANNOTATIONS = [Get, Post, Put, Patch, Delete]
-    private static final List<Class> USER_CONTROLLERS = [GoalController, MetricController, ObservationController, AdjustmentController, TodayController, ProfileController]
+    private static final List<Class> USER_CONTROLLERS = [GoalController, MetricController, ObservationController, AdjustmentController, TodayController, ProfileController, DashboardController]
 
     private static List<Method> routesOf(Class controller) {
         controller.declaredMethods.findAll { Method method -> ROUTE_ANNOTATIONS.any { method.isAnnotationPresent(it) } }
@@ -24,7 +24,7 @@ class RouteSecurityTest {
     void testEveryUserDataRouteRequiresAUserAndRejectsInternalTokens() {
         List<Method> routes = USER_CONTROLLERS.collectMany { routesOf(it) }
 
-        assert routes.size() == 24
+        assert routes.size() == 25
         routes.each { Method route ->
             Secure secure = route.getAnnotation(Secure)
             assert secure, "${route.declaringClass.simpleName}.${route.name} has no @Secure"
