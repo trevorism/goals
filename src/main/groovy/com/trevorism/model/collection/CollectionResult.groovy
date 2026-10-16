@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonInclude
 class CollectionResult {
 
     int asked
+    int measured
     int alreadyRecorded
     int missed
     int failed

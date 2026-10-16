@@ -35,6 +35,7 @@ class GoalsWorld {
     Map eventOutcome
     Map dashboard
     Map delegate
+    List measurements
 
     Map createRoot() {
         root = postJson("api/goal", [title: "${MARKER} root goal".toString(), startDate: daysFromToday(-2), endDate: daysFromToday(180)])
@@ -91,6 +92,10 @@ class GoalsWorld {
     void revokeDelegate() {
         authClient.delete("${BASE_URL}/api/delegate/${delegate.id}".toString())
         createdDelegateIds.remove(delegate.id as String)
+    }
+
+    List fetchMeasurements() {
+        measurements = gson.fromJson(authClient.get("${BASE_URL}/api/measurement".toString()), List)
     }
 
     Map fetchDashboard() {

@@ -33,6 +33,7 @@ class CollectionService {
     private final ObservationService observationService
     private final ProfileService profileService
     private final PromptClient promptClient
+    private final MeasurementReader measurementReader
     Clock clock = Clock.systemUTC()
 
     CollectionService(@Named("metricStore") Repository<GoalMetric> metricStore,
@@ -41,7 +42,8 @@ class CollectionService {
                       @Named("pendingAsk") OwnedRepository<GoalPendingAsk> pendingAskRepository,
                       ObservationService observationService,
                       ProfileService profileService,
-                      PromptClient promptClient) {
+                      PromptClient promptClient,
+                      MeasurementReader measurementReader) {
         this.metricStore = metricStore
         this.goalStore = goalStore
         this.pendingAskStore = pendingAskStore
@@ -49,13 +51,15 @@ class CollectionService {
         this.observationService = observationService
         this.profileService = profileService
         this.promptClient = promptClient
+        this.measurementReader = measurementReader
     }
 
     CollectionResult tick() {
         CollectionResult result = new CollectionResult()
         expireOpenAsks(result)
         askDueQuestions(result)
-        log.info("Collection tick: asked ${result.asked}, already recorded ${result.alreadyRecorded}, missed ${result.missed}, failed ${result.failed}")
+        measureDueMetrics(result)
+        log.info("Collection tick: asked ${result.asked}, measured ${result.measured}, already recorded ${result.alreadyRecorded}, missed ${result.missed}, failed ${result.failed}")
         return result
     }
 
@@ -89,22 +93,66 @@ class CollectionService {
     }
 
     private void askDueQuestions(CollectionResult result) {
-        List<GoalMetric> promptMetrics = metricStore.filter(new SimpleFilter("source", FilterConstants.OPERATOR_EQUAL, MetricSourceType.PROMPT))
+        eachEnabledMetric(MetricSourceType.PROMPT, result) { GoalMetric metric, Map<String, Goal> goalsById, ZoneId zone, LocalDate today ->
+            askIfDue(metric, goalsById, zone, today, result)
+        }
+    }
+
+    private void measureDueMetrics(CollectionResult result) {
+        Map<String, Double> readings = [:]
+        Map<String, Exception> readFailures = [:]
+        eachEnabledMetric(MetricSourceType.HTTP, result) { GoalMetric metric, Map<String, Goal> goalsById, ZoneId zone, LocalDate today ->
+            measureIfDue(metric, goalsById, zone, today, { String measurementId -> readOnce(measurementId, readings, readFailures) }, result)
+        }
+    }
+
+    private Double readOnce(String measurementId, Map<String, Double> readings, Map<String, Exception> readFailures) {
+        if (readFailures.containsKey(measurementId)) {
+            throw readFailures[measurementId]
+        }
+        if (!readings.containsKey(measurementId)) {
+            try {
+                readings[measurementId] = measurementReader.read(measurementId)
+            } catch (Exception e) {
+                readFailures[measurementId] = e
+                throw e
+            }
+        }
+        readings[measurementId]
+    }
+
+    private void eachEnabledMetric(String source, CollectionResult result, Closure collect) {
+        List<GoalMetric> sourceMetrics = metricStore.filter(new SimpleFilter("source", FilterConstants.OPERATOR_EQUAL, source))
                 .findAll { it.enabled != false }
-        promptMetrics.groupBy { it.ownerId }.each { String ownerId, List<GoalMetric> metrics ->
+        sourceMetrics.groupBy { it.ownerId }.each { String ownerId, List<GoalMetric> metrics ->
             Map<String, Goal> goalsById = goalStore.filter(new SimpleFilter(OwnedRepository.OWNER_FIELD, FilterConstants.OPERATOR_EQUAL, ownerId))
                     .collectEntries { [it.id, it] }
             ZoneId zone = profileService.zoneFor(ownerId)
             LocalDate today = LocalDate.now(clock.withZone(zone))
             metrics.each { GoalMetric metric ->
                 try {
-                    askIfDue(metric, goalsById, zone, today, result)
+                    collect(metric, goalsById, zone, today)
                 } catch (Exception e) {
                     result.failed++
-                    log.warn("Unable to ask about metric ${metric.id}: ${e.message}")
+                    log.warn("Unable to collect ${source} metric ${metric.id}: ${e.message}")
                 }
             }
         }
+    }
+
+    private void measureIfDue(GoalMetric metric, Map<String, Goal> goalsById, ZoneId zone, LocalDate today,
+                              Closure<Double> read, CollectionResult result) {
+        if (!isOpen(goalsById[metric.goalId], goalsById, today)) {
+            return
+        }
+        CollectionPeriod period = CollectionPeriod.containing(today, metric.frequency, zone)
+        if (metric.lastObservedAt != null && period.contains(utcDay(metric.lastObservedAt))) {
+            result.alreadyRecorded++
+            return
+        }
+        observationService.create(metric.ownerId, metric.id, new GoalObservation(value: read(metric.measurementId),
+                observedAt: period.observedAt(), metricSource: MetricSourceType.HTTP, sourceRef: metric.measurementId))
+        result.measured++
     }
 
     private void askIfDue(GoalMetric metric, Map<String, Goal> goalsById, ZoneId zone, LocalDate today, CollectionResult result) {
