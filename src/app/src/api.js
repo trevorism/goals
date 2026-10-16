@@ -19,6 +19,10 @@ export const metricsApi = {
   remove: (id) => data(axios.delete(`/api/metric/${id}`))
 }
 
+export const measurementsApi = {
+  list: () => data(axios.get('/api/measurement'))
+}
+
 export const observationsApi = {
   list: (metricId) => data(axios.get(`/api/metric/${metricId}/observation`)),
   create: (metricId, observation) => data(axios.post(`/api/metric/${metricId}/observation`, observation)),

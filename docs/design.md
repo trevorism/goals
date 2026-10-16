@@ -175,6 +175,7 @@ from stored entities:
 | choices | `[{value, label}]`, as in prompt. A missing value is derived from the label (`"Just OK"` → `just-ok`) and made unique. Boolean metrics always get `yes`/`no`. |
 | frequency | `FrequencyType`; `daily` by default |
 | source | `MetricSourceType`; `manual` by default |
+| measurementid | With `source = http`, the id of a measurement in the catalog (section 8.3). The metric's type must match the measurement's. Cleared (set to empty) when the source changes to anything else. |
 | nextdueat, lastobservedat, enabled | `lastobservedat` is the date of the most recent observation, kept up to date when values are recorded, edited or deleted. The Today view uses it to find what's due without querying observations. Datastore can't clear a field, so deleting every observation leaves the last date in place. |
 
 ### 4.3 Observation
@@ -260,8 +261,12 @@ counts as No.
      goal dates include today, asks one question for the current period in the owner's timezone. It
      skips the metric when a question was already asked for that period, or a value is already
      recorded for it (from `lastobservedat`).
-  3. Returns counts: `asked`, `alreadyRecorded`, `missed`, `failed`. A failure on one metric doesn't
-     stop the others.
+  3. For every enabled metric with `source = http` under the same conditions, reads its catalogued
+     measurement (section 8.3) and records the value for the current period (`metricsource = http`,
+     `sourceref` = the measurement id). Each measurement is read at most once per tick, however many
+     metrics use it. It skips the metric when the period already has a value.
+  4. Returns counts: `asked`, `measured`, `alreadyRecorded`, `missed`, `failed`. A failure on one
+     metric doesn't stop the others, and a failed measurement is retried at the next tick.
 - One daily tick supports daily, weekly and monthly metrics without a schedule task per metric. A
   question goes out at the first tick of its period: daily questions at 11:07 UTC, weekly ones on
   Monday, monthly ones on the 1st.
@@ -275,7 +280,8 @@ counts as No.
 |---|---|
 | `manual` | Does nothing. The metric shows on the Today page until a value is recorded. |
 | `prompt` | The tick asks a private question in prompt (see 6.3). The metric also shows on Today, so it can be entered by hand; whichever value arrives first wins. |
-| `http`, `event`, `aggregation` | Phase 5. |
+| `http` | The tick reads the metric's `measurementid` from the measurement catalog (section 8.3) once per period. The metric doesn't show on Today, but a value can still be entered by hand on the goal page. |
+| `event`, `aggregation` | Later in phase 5, when a real metric needs them. Choosing them does nothing yet. |
 
 ### 6.3 Prompt integration
 - **Question:** `targetIdentityId` = the owner, `privateQuestion = true` (only goals and the owner can
@@ -392,8 +398,8 @@ service list.
 
 | actionid | Kind | Default approval | Example |
 |---|---|---|---|
-| `read.trevorism` | Measure: GET from a catalogued service and path | no | Paying customers from `billing /api/payment` |
-| `read.aggregation` | Measure: `data /aggregation` | no | Count objects of a kind |
+| `read.trevorism` | Measure: a catalogued measurement (below) | no | Paying customers from `billing /api/payment` |
+| `read.aggregation` | Measure: `data /aggregation`, limited to the owner's own data | no | Count objects of a kind |
 | `ask.prompt` | Ask someone a question | no | Ask an accountability partner for a check-in |
 | `email.self` | Email the owner | no | Weekly reminder |
 | `email.send` | Email other people (outward-facing) | **always** | Send an outreach email |
@@ -408,6 +414,22 @@ service list.
 - There are per-node and per-user daily run limits.
 - Actions run with goals' app identity, so each action checks that its parameters only touch the
   owner's resources.
+
+**Measurement catalog (5a):** read actions are fixed measurements, not a service and path the user
+types in. The datastore namespace is shared between apps, and goals' token can read across it, so a
+user-supplied kind or path would let any user read another app's data through goals.
+- `MeasurementCatalog` defines each measurement in code: `id`, `label`, `description`, `metricType`,
+  `unit`, and the roles allowed to use it. `HttpMeasurementReader` turns the service's response into
+  a number.
+- A metric's `measurementid` is checked against the catalog when the metric is saved. Choosing a
+  measurement, or switching to `http`, requires one of its roles **on the requester's own token**. A
+  delegate acting with `?onBehalfOf=` gets no measurement roles, so it can't attach business-wide data
+  to someone's goals. Later edits that leave the measurement alone aren't rechecked.
+- `GET /api/measurement` lists the measurements the caller can use.
+
+| measurementid | Roles | Value |
+|---|---|---|
+| `billing.paying-customers` | `admin` | Distinct `ownerId`s among `CONFIRMED` `RECEIVE` transactions from `billing GET /api/payment`, counting real-money providers only (`stripe` and `*-mainnet`) |
 
 ## 9. Security
 
@@ -484,6 +506,7 @@ alert emails**. Status lives on an in-app dashboard that the owner opens when th
 | `GET/POST /goal/{id}/adjustment`, `PUT/DELETE /adjustment/{id}` | Adjustments |
 | `POST /goal/{id}/decompose` | Propose children (section 11.3); persists nothing |
 | `POST /goal/{id}/decompose/accept` | Create the accepted children |
+| `GET /measurement` | The catalogued measurements the caller may attach to a metric (section 8.3) |
 | `PUT /goal/{id}/automation`, `GET /goal/{id}/automation/run` | Automation settings and run log |
 | `GET /dashboard?date=yyyy-MM-dd` | Every root goal's status and headline, plus needs-you items |
 | `GET /today?date=yyyy-MM-dd` | Metrics with nothing recorded in their current day, week or month, for the caller's local date (phase 1: manual metrics only; missed, invalid and approvals come in phases 2 and 5) |
@@ -545,8 +568,13 @@ tests in its PR environment.
 **Phase 4: quiet dashboard** (section 10): the home page shows every goal's status, and a needs-you strip appears only when something is stuck. No emails.
 
 **Phase 5: automation ladder**
-- 5a. `measured`: the `http`, `aggregation` and `event` sources, and the action catalog's read
-  actions. The paying-customers metric comes from billing.
+- 5a. `measured`, in slices:
+  - 5a-1. The measurement catalog and the `http` source, collected by the tick. Its one entry is
+    billing's paying customers, so the paying-customers metric (moved to the root goal) comes from
+    billing.
+  - Later: the `aggregation` and `event` sources, each when a real metric needs it.
+  - The `Goal` automation fields wait for 5b, when approvals first need them. Until then a node's
+    `measured` level follows from its metrics' sources.
 - 5b. `approved`: prompt approvals and AutomationRun. Outreach is drafted with `chat`, approved, then
   sent with `email`.
 - 5c. `automated`: unattended actions, failure fallback and automated-coverage reporting.

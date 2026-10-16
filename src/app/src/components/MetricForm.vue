@@ -1,5 +1,6 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { measurementsApi } from '../api.js'
 import { buildMetricPayload, metricFormFrom, validateMetric } from '../forms.js'
 import { FrequencyType, MetricDirectionType, MetricMeasuresType, MetricSourceType, MetricType, metricTypeLabels } from '../types.js'
 
@@ -20,10 +21,38 @@ const measuresOptions = [
   { value: MetricMeasuresType.EFFORT, text: 'Effort — the work toward it' }
 ]
 
-const sourceOptions = [
-  { value: MetricSourceType.MANUAL, text: 'I enter it myself' },
-  { value: MetricSourceType.PROMPT, text: 'Ask me in prompt' }
-]
+const measurements = ref([])
+
+const sourceOptions = computed(() => {
+  const options = [
+    { value: MetricSourceType.MANUAL, text: 'I enter it myself' },
+    { value: MetricSourceType.PROMPT, text: 'Ask me in prompt' }
+  ]
+  if (measurements.value.length || form.source === MetricSourceType.HTTP) {
+    options.push({ value: MetricSourceType.HTTP, text: 'Measured automatically' })
+  }
+  return options
+})
+
+const selectedMeasurement = computed(() => measurements.value.find((measurement) => measurement.id === form.measurementId))
+
+onMounted(() => {
+  Promise.resolve()
+    .then(() => measurementsApi.list())
+    .then((available) => {
+      measurements.value = available ?? []
+    })
+    .catch(() => {
+      measurements.value = []
+    })
+})
+
+watch(selectedMeasurement, (measurement) => {
+  if (measurement && !editing.value) {
+    form.type = measurement.metricType
+    form.unit = form.unit || measurement.unit || ''
+  }
+})
 
 const hasDirection = computed(() => form.type === MetricType.NUMERIC || form.type === MetricType.SCALE)
 
@@ -54,7 +83,7 @@ function submit() {
         :options="typeOptions"
         value-by="value"
         text-by="text"
-        :disabled="editing"
+        :disabled="editing || form.source === 'http'"
       />
     </div>
     <div class="flex flex-wrap gap-3">
@@ -65,6 +94,17 @@ function submit() {
     <div v-if="form.source === 'prompt'" class="prompt-settings flex flex-col gap-1">
       <va-input v-model="form.promptText" class="prompt-text" label="Question (optional)" placeholder="Leave empty to ask “Goal: metric name”" />
       <span class="text-xs text-slate-500">A private question is sent to you in prompt once per {{ form.frequency === 'daily' ? 'day' : form.frequency === 'weekly' ? 'week' : 'month' }}. Your answer is recorded here.</span>
+    </div>
+    <div v-if="form.source === 'http'" class="measurement-settings flex flex-col gap-1">
+      <va-select
+        v-model="form.measurementId"
+        class="measurement-id"
+        label="Measure"
+        :options="measurements"
+        value-by="id"
+        text-by="label"
+      />
+      <span class="text-xs text-slate-500">{{ selectedMeasurement?.description ?? 'Goals reads this value' }} once per {{ form.frequency === 'daily' ? 'day' : form.frequency === 'weekly' ? 'week' : 'month' }} and records it here.</span>
     </div>
 
     <div v-if="hasDirection" class="flex flex-wrap gap-3">

@@ -1,3 +1,10 @@
+## 0.10.0
+
+- Metrics can be measured automatically: choose "Measured automatically" and pick a measurement, and the daily tick records its value once per day, week or month. Measured metrics stay off the Today page.
+- The first measurement is paying customers from billing: distinct customers with a confirmed real-money payment (Stripe or a mainnet network). Only admins can use it, and only when acting as themselves, not through delegation.
+- Measurements are defined in code, so goals never reads a service or path a user types in.
+- New route `GET /api/measurement` lists the measurements you can use. The tick result adds a `measured` count.
+
 ## 0.9.0
 
 - Delegation: on the new Settings page, give another identity (such as the Claude MCP `agent`) read or read-and-edit access to your goals. It acts for you by adding `?onBehalfOf=<your id>` to its requests. Delegates can never delete, and you can revoke access at any time.

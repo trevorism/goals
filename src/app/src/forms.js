@@ -73,6 +73,9 @@ export function buildMetricPayload(form) {
     source: form.source,
     promptText: form.source === MetricSourceType.PROMPT ? form.promptText?.trim() ?? '' : ''
   }
+  if (form.source === MetricSourceType.HTTP) {
+    payload.measurementId = form.measurementId
+  }
   if (form.type === MetricType.NUMERIC || form.type === MetricType.SCALE) {
     payload.direction = form.direction
     payload.baseline = toNumber(form.baseline)
@@ -106,6 +109,9 @@ export function validateMetric(form) {
   if (!form.name?.trim()) {
     return 'Enter a name'
   }
+  if (form.source === MetricSourceType.HTTP && !form.measurementId) {
+    return 'Choose what to measure'
+  }
   if (form.type === MetricType.SCALE) {
     const min = toNumber(form.scaleMin)
     const max = toNumber(form.scaleMax)
@@ -137,6 +143,7 @@ export function metricFormFrom(metric) {
     frequency: metric?.frequency ?? 'daily',
     source: metric?.source ?? MetricSourceType.MANUAL,
     promptText: metric?.promptText ?? '',
+    measurementId: metric?.measurementId ?? '',
     direction: metric?.direction ?? MetricDirectionType.INCREASE,
     unit: metric?.unit ?? '',
     baseline: metric?.baseline ?? '',
