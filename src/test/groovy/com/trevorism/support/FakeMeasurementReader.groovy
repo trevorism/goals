@@ -10,10 +10,10 @@ class FakeMeasurementReader implements MeasurementReader {
 
     @Override
     Double read(String measurementId) {
+        reads << measurementId
         if (failing) {
             throw new IllegalStateException("billing is down")
         }
-        reads << measurementId
         values[measurementId]
     }
 }

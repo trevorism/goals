@@ -254,4 +254,17 @@ class CollectionServiceTest {
         assert retried.measured == 1
         assert store.observations.store.find { it.metricId == customers.id }.value == 3d
     }
+
+    @Test
+    void testAFailedMeasurementIsNotReadAgainForOtherMetricsInTheSameTick() {
+        measuredMetric()
+        measuredMetric([:], OTHER_OWNER, store.goalService().createRoot(OTHER_OWNER, rootGoal()))
+        measurements.failing = true
+
+        CollectionResult result = service.tick()
+
+        assert result.failed == 2
+        assert result.measured == 0
+        assert measurements.reads == [MeasurementCatalog.BILLING_PAYING_CUSTOMERS]
+    }
 }

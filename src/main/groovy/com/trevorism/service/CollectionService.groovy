@@ -100,9 +100,25 @@ class CollectionService {
 
     private void measureDueMetrics(CollectionResult result) {
         Map<String, Double> readings = [:]
+        Map<String, Exception> readFailures = [:]
         eachEnabledMetric(MetricSourceType.HTTP, result) { GoalMetric metric, Map<String, Goal> goalsById, ZoneId zone, LocalDate today ->
-            measureIfDue(metric, goalsById, zone, today, readings, result)
+            measureIfDue(metric, goalsById, zone, today, { String measurementId -> readOnce(measurementId, readings, readFailures) }, result)
         }
+    }
+
+    private Double readOnce(String measurementId, Map<String, Double> readings, Map<String, Exception> readFailures) {
+        if (readFailures.containsKey(measurementId)) {
+            throw readFailures[measurementId]
+        }
+        if (!readings.containsKey(measurementId)) {
+            try {
+                readings[measurementId] = measurementReader.read(measurementId)
+            } catch (Exception e) {
+                readFailures[measurementId] = e
+                throw e
+            }
+        }
+        readings[measurementId]
     }
 
     private void eachEnabledMetric(String source, CollectionResult result, Closure collect) {
@@ -125,7 +141,7 @@ class CollectionService {
     }
 
     private void measureIfDue(GoalMetric metric, Map<String, Goal> goalsById, ZoneId zone, LocalDate today,
-                              Map<String, Double> readings, CollectionResult result) {
+                              Closure<Double> read, CollectionResult result) {
         if (!isOpen(goalsById[metric.goalId], goalsById, today)) {
             return
         }
@@ -134,10 +150,7 @@ class CollectionService {
             result.alreadyRecorded++
             return
         }
-        if (!readings.containsKey(metric.measurementId)) {
-            readings[metric.measurementId] = measurementReader.read(metric.measurementId)
-        }
-        observationService.create(metric.ownerId, metric.id, new GoalObservation(value: readings[metric.measurementId],
+        observationService.create(metric.ownerId, metric.id, new GoalObservation(value: read(metric.measurementId),
                 observedAt: period.observedAt(), metricSource: MetricSourceType.HTTP, sourceRef: metric.measurementId))
         result.measured++
     }

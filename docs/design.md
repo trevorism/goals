@@ -264,7 +264,7 @@ counts as No.
   3. For every enabled metric with `source = http` under the same conditions, reads its catalogued
      measurement (section 8.3) and records the value for the current period (`metricsource = http`,
      `sourceref` = the measurement id). Each measurement is read at most once per tick, however many
-     metrics use it. It skips the metric when the period already has a value.
+     metrics use it; when that read fails, every metric using it fails for the tick without another read. It skips the metric when the period already has a value.
   4. Returns counts: `asked`, `measured`, `alreadyRecorded`, `missed`, `failed`. A failure on one
      metric doesn't stop the others, and a failed measurement is retried at the next tick.
 - One daily tick supports daily, weekly and monthly metrics without a schedule task per metric. A
@@ -425,7 +425,8 @@ user-supplied kind or path would let any user read another app's data through go
   measurement, or switching to `http`, requires one of its roles **on the requester's own token**. A
   delegate acting with `?onBehalfOf=` gets no measurement roles, so it can't attach business-wide data
   to someone's goals. Later edits that leave the measurement alone aren't rechecked.
-- `GET /api/measurement` lists the measurements the caller can use.
+- `GET /api/measurement` lists the measurements the caller can use. It stays owner-only, and a call
+  with `?onBehalfOf=` naming someone else lists nothing.
 
 | measurementid | Roles | Value |
 |---|---|---|

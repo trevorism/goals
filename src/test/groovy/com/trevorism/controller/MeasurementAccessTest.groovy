@@ -31,6 +31,26 @@ class MeasurementAccessTest {
     }
 
     @Test
+    void testAnOwnerOnlyRouteCalledOnBehalfOfAnotherOwnerGetsNoMeasurementRoles() {
+        HttpRequest<?> request = HttpRequest.GET("/api/measurement")
+        request.parameters.add(OwnerResolver.ON_BEHALF_OF, "owner-2")
+
+        Collection<String> roles = ServerRequestContext.with(request, { MeasurementAccess.rolesFor(admin) } as java.util.function.Supplier)
+
+        assert roles == []
+    }
+
+    @Test
+    void testNamingYourselfAsOnBehalfOfKeepsYourRoles() {
+        HttpRequest<?> request = HttpRequest.GET("/api/measurement")
+        request.parameters.add(OwnerResolver.ON_BEHALF_OF, "admin-1")
+
+        Collection<String> roles = ServerRequestContext.with(request, { MeasurementAccess.rolesFor(admin) } as java.util.function.Supplier)
+
+        assert roles == [Roles.ADMIN]
+    }
+
+    @Test
     void testNoAuthenticationMeansNoRoles() {
         assert MeasurementAccess.rolesFor(null) == []
     }
