@@ -12,6 +12,8 @@ import com.trevorism.model.types.GoalStatusType
 import com.trevorism.model.types.MetricSourceType
 import com.trevorism.model.types.MetricType
 import com.trevorism.model.types.PendingAskStatusType
+import com.trevorism.secure.Roles
+import com.trevorism.support.FakeMeasurementReader
 import com.trevorism.support.FakePromptClient
 import com.trevorism.support.TestStore
 import org.junit.jupiter.api.Test
@@ -31,8 +33,9 @@ class CollectionServiceTest {
 
     private final TestStore store = new TestStore()
     private final FakePromptClient prompt = new FakePromptClient()
+    private final FakeMeasurementReader measurements = new FakeMeasurementReader()
     private final CollectionService service = new CollectionService(store.metrics, store.goals, store.pendingAsks, store.pendingAskRepository,
-            store.observationService(), store.profileService(), prompt)
+            store.observationService(), store.profileService(), prompt, measurements)
     private final Goal root = store.goalService().createRoot(OWNER, rootGoal())
 
     CollectionServiceTest() {
@@ -182,5 +185,86 @@ class CollectionServiceTest {
         assert weight.unit == "lb"
         assert !prompt.questions.find { it.text.startsWith("Sleep: Energy") }.containsKey("answerType")
         assert prompt.questions.size() == 3
+    }
+
+    private GoalMetric measuredMetric(Map properties = [:], String owner = OWNER, Goal goal = root) {
+        store.metricService().create(owner, goal.id, new GoalMetric([name: "Paying customers", source: MetricSourceType.HTTP,
+                measurementId: MeasurementCatalog.BILLING_PAYING_CUSTOMERS] + properties), [Roles.ADMIN])
+    }
+
+    @Test
+    void testTheTickRecordsOneMeasuredValuePerPeriod() {
+        GoalMetric customers = measuredMetric(frequency: FrequencyType.WEEKLY)
+        measurements.values[MeasurementCatalog.BILLING_PAYING_CUSTOMERS] = 2d
+
+        CollectionResult first = service.tick()
+        CollectionResult second = service.tick()
+
+        assert first.measured == 1
+        assert second.measured == 0
+        assert second.alreadyRecorded == 1
+        assert prompt.questions.isEmpty()
+        GoalObservation observation = store.observations.store.find { it.metricId == customers.id }
+        assert observation.value == 2d
+        assert observation.observedAt == day(39)
+        assert observation.metricSource == MetricSourceType.HTTP
+        assert observation.sourceRef == MeasurementCatalog.BILLING_PAYING_CUSTOMERS
+        assert store.metricService().get(OWNER, customers.id).lastObservedAt == day(39)
+    }
+
+    @Test
+    void testMetricsSharingAMeasurementReadItOncePerTick() {
+        measuredMetric()
+        measuredMetric([:], OTHER_OWNER, store.goalService().createRoot(OTHER_OWNER, rootGoal()))
+        measurements.values[MeasurementCatalog.BILLING_PAYING_CUSTOMERS] = 1d
+
+        CollectionResult result = service.tick()
+
+        assert result.measured == 2
+        assert measurements.reads == [MeasurementCatalog.BILLING_PAYING_CUSTOMERS]
+    }
+
+    @Test
+    void testMeasuredMetricsOnClosedGoalsOrDisabledAreNotMeasured() {
+        Goal later = store.goalService().createChild(OWNER, root.id, new Goal(title: "Later", startDate: day(50), endDate: day(60)))
+        measuredMetric([:], OWNER, later)
+        GoalMetric paused = measuredMetric()
+        store.metricService().update(OWNER, paused.id, new GoalMetric(enabled: false))
+        measurements.values[MeasurementCatalog.BILLING_PAYING_CUSTOMERS] = 1d
+
+        CollectionResult result = service.tick()
+
+        assert result.measured == 0
+        assert measurements.reads.isEmpty()
+    }
+
+    @Test
+    void testAFailedMeasurementIsCountedAndRetriedNextTick() {
+        GoalMetric customers = measuredMetric()
+        promptMetric()
+        measurements.failing = true
+
+        CollectionResult failed = service.tick()
+        measurements.failing = false
+        measurements.values[MeasurementCatalog.BILLING_PAYING_CUSTOMERS] = 3d
+        CollectionResult retried = service.tick()
+
+        assert failed.failed == 1
+        assert failed.asked == 1
+        assert retried.measured == 1
+        assert store.observations.store.find { it.metricId == customers.id }.value == 3d
+    }
+
+    @Test
+    void testAFailedMeasurementIsNotReadAgainForOtherMetricsInTheSameTick() {
+        measuredMetric()
+        measuredMetric([:], OTHER_OWNER, store.goalService().createRoot(OTHER_OWNER, rootGoal()))
+        measurements.failing = true
+
+        CollectionResult result = service.tick()
+
+        assert result.failed == 2
+        assert result.measured == 0
+        assert measurements.reads == [MeasurementCatalog.BILLING_PAYING_CUSTOMERS]
     }
 }

@@ -39,7 +39,8 @@ class MetricController {
     @Post(value = "/goal/{goalId}/metric", produces = MediaType.APPLICATION_JSON, consumes = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     GoalMetric create(String goalId, @Body GoalMetric metric, Authentication authentication) {
-        metricService.create(owners.ownerFor(authentication), goalId, metric)
+        String ownerId = owners.ownerFor(authentication)
+        metricService.create(ownerId, goalId, metric, MeasurementAccess.rolesFor(authentication))
     }
 
     @Tag(name = "Metric Operations")
@@ -55,7 +56,8 @@ class MetricController {
     @Put(value = "/metric/{id}", produces = MediaType.APPLICATION_JSON, consumes = MediaType.APPLICATION_JSON)
     @Secure(Roles.USER)
     GoalMetric update(String id, @Body GoalMetric metric, Authentication authentication) {
-        metricService.update(owners.ownerFor(authentication), id, metric)
+        String ownerId = owners.ownerFor(authentication)
+        metricService.update(ownerId, id, metric, MeasurementAccess.rolesFor(authentication))
     }
 
     @Tag(name = "Metric Operations")
