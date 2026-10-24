@@ -71,14 +71,10 @@ describe('GoalList dashboard', () => {
     const stuck = await mountList({
       goals: [health],
       needsYou: [
-        { type: 'unreadable_answer', rootId: 'g1', metricId: 'm1', title: 'Body weight', detail: 'Couldn’t read a number from "lots"', date: '2026-10-02T00:00:00Z' },
-        { type: 'missed_questions', rootId: 'g1', metricId: 'm2', title: 'Walked', count: 4, date: '2026-10-03T00:00:00Z' },
         { type: 'past_end_date', rootId: 'g1', goalId: 'g9', title: 'Cardio base', date: '2026-09-30T00:00:00Z' }
       ]
     })
     expect(stuck.findAll('.needs-you-item').map((item) => item.text())).toEqual([
-      'Couldn’t record “Body weight” for Oct 2, 2026: Couldn’t read a number from "lots"',
-      '“Walked”: 4 questions in a row went unanswered',
       '“Cardio base” ended Sep 30, 2026 but is still active'
     ])
   })

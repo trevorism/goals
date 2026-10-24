@@ -5,9 +5,7 @@ import com.fasterxml.jackson.annotation.JsonInclude
 @JsonInclude(JsonInclude.Include.ALWAYS)
 class CollectionResult {
 
-    int asked
     int measured
     int alreadyRecorded
-    int missed
     int failed
 }

@@ -71,7 +71,7 @@ onMounted(load)
     <section v-if="dashboard.needsYou.length" class="needs-you rounded border border-slate-200 bg-slate-50 p-3">
       <h2 class="mb-1 text-sm font-semibold text-slate-700">Needs you</h2>
       <ul class="flex flex-col gap-1 text-sm">
-        <li v-for="item in dashboard.needsYou" :key="`${item.type}-${item.metricId ?? item.goalId}-${item.date}`" class="needs-you-item">
+        <li v-for="item in dashboard.needsYou" :key="`${item.type}-${item.goalId}-${item.date}`" class="needs-you-item">
           <router-link :to="{ name: 'goal', params: { id: item.rootId } }" class="text-slate-700">{{ describeNeedsYou(item) }}</router-link>
         </li>
       </ul>

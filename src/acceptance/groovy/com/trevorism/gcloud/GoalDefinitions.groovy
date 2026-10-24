@@ -82,13 +82,6 @@ When(~/^I try to set my timezone to "(.*)"$/) { String timezone ->
     attemptAuthenticatedPut("api/profile", [timezone: timezone])
 }
 
-When(~/^an answered event arrives for a question goals never asked$/) { ->
-    sendAnsweredEvent([questionId: "1", answerId: "2", answerText: "spoofed"])
-}
-
-Then(~/^the event is ignored$/) { ->
-    assert eventOutcome.outcome == "ignored"
-}
 
 When(~/^I create a goal anonymously$/) { ->
     anonPost("api/goal", [title: "anonymous", startDate: "2026-10-01", endDate: "2027-03-31"])

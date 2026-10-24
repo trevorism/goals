@@ -8,9 +8,6 @@ class NeedsYouItem {
     String type
     String rootId
     String goalId
-    String metricId
     String title
-    String detail
     Date date
-    Integer count
 }

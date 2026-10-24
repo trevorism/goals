@@ -25,8 +25,7 @@ const measurements = ref([])
 
 const sourceOptions = computed(() => {
   const options = [
-    { value: MetricSourceType.MANUAL, text: 'I enter it myself' },
-    { value: MetricSourceType.PROMPT, text: 'Ask me in prompt' }
+    { value: MetricSourceType.MANUAL, text: 'I enter it myself' }
   ]
   if (measurements.value.length || form.source === MetricSourceType.HTTP) {
     options.push({ value: MetricSourceType.HTTP, text: 'Measured automatically' })
@@ -90,10 +89,6 @@ function submit() {
       <va-select v-model="form.measures" label="Measures" :options="measuresOptions" value-by="value" text-by="text" />
       <va-select v-model="form.frequency" label="Frequency" :options="FrequencyType.ALL" />
       <va-select v-model="form.source" class="metric-source" label="Collected by" :options="sourceOptions" value-by="value" text-by="text" />
-    </div>
-    <div v-if="form.source === 'prompt'" class="prompt-settings flex flex-col gap-1">
-      <va-input v-model="form.promptText" class="prompt-text" label="Question (optional)" placeholder="Leave empty to ask “Goal: metric name”" />
-      <span class="text-xs text-slate-500">A private question is sent to you in prompt once per {{ form.frequency === 'daily' ? 'day' : form.frequency === 'weekly' ? 'week' : 'month' }}. Your answer is recorded here.</span>
     </div>
     <div v-if="form.source === 'http'" class="measurement-settings flex flex-col gap-1">
       <va-select

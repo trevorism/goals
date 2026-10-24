@@ -74,7 +74,6 @@ describe('metrics', () => {
       measures: 'outcome',
       frequency: 'daily',
       source: 'manual',
-      promptText: '',
       direction: 'decrease',
       baseline: 62,
       target: 55,
@@ -114,14 +113,11 @@ describe('metrics', () => {
     expect(validateMetric({ ...base, name: 'x' })).toBe('')
   })
 
-  it('sends the prompt question only for prompt metrics', () => {
-    const asked = { ...metricFormFrom(null), name: 'Walked', type: 'boolean', source: 'prompt', promptText: '  Did you walk today? ' }
-    const manual = { ...asked, source: 'manual' }
-
-    expect(buildMetricPayload(asked)).toMatchObject({ source: 'prompt', promptText: 'Did you walk today?' })
-    expect(buildMetricPayload(manual)).toMatchObject({ source: 'manual', promptText: '' })
-    expect(metricFormFrom({ name: 'x', source: 'prompt', promptText: 'Q?' })).toMatchObject({ source: 'prompt', promptText: 'Q?' })
+  it('opens metrics once asked in prompt as entered by hand', () => {
+    expect(metricFormFrom({ name: 'x', source: 'prompt', promptText: 'Q?' }).source).toBe('manual')
+    expect(metricFormFrom({ name: 'x', source: 'http', measurementId: 'm' }).source).toBe('http')
     expect(metricFormFrom(null).source).toBe('manual')
+    expect(buildMetricPayload({ ...metricFormFrom(null), name: 'Walked' })).not.toHaveProperty('promptText')
   })
 
   it('prefills an edit form from a stored metric', () => {

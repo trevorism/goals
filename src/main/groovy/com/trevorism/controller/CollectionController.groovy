@@ -22,7 +22,7 @@ class CollectionController {
     ProvisioningService provisioningService
 
     @Tag(name = "Collection Operations")
-    @Operation(summary = "Daily tick: ask due prompt questions and close expired ones **Secure")
+    @Operation(summary = "Daily tick: record catalogued measurements for due measured metrics **Secure")
     @Post(value = "/tick", produces = MediaType.APPLICATION_JSON, consumes = MediaType.ALL)
     @Secure(value = Roles.SYSTEM, allowInternal = true)
     CollectionResult tick() {
@@ -30,7 +30,7 @@ class CollectionController {
     }
 
     @Tag(name = "Collection Operations")
-    @Operation(summary = "Create the answer subscription and the daily tick schedule if they don't exist **Secure")
+    @Operation(summary = "Create the daily tick schedule if it doesn't exist **Secure")
     @Post(value = "/provision", produces = MediaType.APPLICATION_JSON, consumes = MediaType.ALL)
     @Secure(Roles.SYSTEM)
     Map<String, String> provision() {

@@ -46,7 +46,6 @@ export const AdjustmentCategoryType = {
 
 export const MetricSourceType = {
   MANUAL: 'manual',
-  PROMPT: 'prompt',
   HTTP: 'http'
 }
 

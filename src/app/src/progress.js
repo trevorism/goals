@@ -396,10 +396,6 @@ export function describeHeadline(row) {
 
 export function describeNeedsYou(item) {
   switch (item.type) {
-    case 'unreadable_answer':
-      return `Couldn\u2019t record \u201c${item.title}\u201d for ${formatDay(item.date)}${item.detail ? `: ${item.detail}` : ''}`
-    case 'missed_questions':
-      return `\u201c${item.title}\u201d: ${item.count} questions in a row went unanswered`
     case 'past_end_date':
       return `\u201c${item.title}\u201d ended ${formatDay(item.date)} but is still active`
     default:
