@@ -52,16 +52,6 @@ class RouteSecurityTest {
     }
 
     @Test
-    void testTheEventReceiverAcceptsTheForwardedPublisherToken() {
-        List<Method> routes = routesOf(EventReceiverController)
-
-        assert routes*.name == ["questionAnswered"]
-        Secure secure = routes[0].getAnnotation(Secure)
-        assert secure.value() == Roles.USER
-        assert secure.allowInternal()
-    }
-
-    @Test
     void testRequesterIdentityReadsTheIdClaim() {
         def authentication = io.micronaut.security.authentication.Authentication.build("someone", [id: "identity-7"])
 

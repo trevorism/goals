@@ -18,7 +18,7 @@ import static com.trevorism.service.Validation.require
 @Singleton
 class TodayService {
 
-    static final List<String> ANSWERABLE_SOURCES = [MetricSourceType.MANUAL, MetricSourceType.PROMPT]
+    static final List<String> ANSWERABLE_SOURCES = [MetricSourceType.MANUAL]
 
     private final OwnedRepository<Goal> goalRepository
     private final OwnedRepository<GoalMetric> metricRepository

@@ -5,7 +5,6 @@ import com.trevorism.model.GoalAdjustment
 import com.trevorism.model.GoalDelegate
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
-import com.trevorism.model.GoalPendingAsk
 import com.trevorism.model.GoalProfile
 import com.trevorism.service.AdjustmentService
 import com.trevorism.service.GoalService
@@ -24,7 +23,6 @@ class TestStore {
     final InMemoryRepository<GoalMetric> metrics = new InMemoryRepository<>()
     final InMemoryRepository<GoalObservation> observations = new InMemoryRepository<>()
     final InMemoryRepository<GoalAdjustment> adjustments = new InMemoryRepository<>()
-    final InMemoryRepository<GoalPendingAsk> pendingAsks = new InMemoryRepository<>()
     final InMemoryRepository<GoalProfile> profiles = new InMemoryRepository<>()
     final InMemoryRepository<GoalDelegate> delegates = new InMemoryRepository<>()
 
@@ -32,16 +30,15 @@ class TestStore {
     final OwnedRepository<GoalMetric> metricRepository = new OwnedRepository<>(metrics, "Metric")
     final OwnedRepository<GoalObservation> observationRepository = new OwnedRepository<>(observations, "Observation")
     final OwnedRepository<GoalAdjustment> adjustmentRepository = new OwnedRepository<>(adjustments, "Adjustment")
-    final OwnedRepository<GoalPendingAsk> pendingAskRepository = new OwnedRepository<>(pendingAsks, "Pending ask")
     final OwnedRepository<GoalProfile> profileRepository = new OwnedRepository<>(profiles, "Profile")
     final OwnedRepository<GoalDelegate> delegateRepository = new OwnedRepository<>(delegates, "Delegate")
 
     GoalService goalService() {
-        new GoalService(goalRepository, metricRepository, observationRepository, adjustmentRepository, pendingAskRepository)
+        new GoalService(goalRepository, metricRepository, observationRepository, adjustmentRepository)
     }
 
     MetricService metricService() {
-        new MetricService(goalRepository, metricRepository, observationRepository, pendingAskRepository, new MeasurementCatalog())
+        new MetricService(goalRepository, metricRepository, observationRepository, new MeasurementCatalog())
     }
 
     ObservationService observationService() {

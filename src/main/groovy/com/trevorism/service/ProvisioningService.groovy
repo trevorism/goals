@@ -16,10 +16,7 @@ import java.time.format.DateTimeFormatter
 class ProvisioningService {
 
     static final String GOALS_BASE_URL = "https://goals.action.trevorism.com"
-    static final String EVENT_BASE_URL = "https://event.data.trevorism.com"
     static final String SCHEDULE_BASE_URL = "https://schedule.action.trevorism.com"
-    static final String SUBSCRIPTION_NAME = "goals-question-answered"
-    static final String ANSWERED_TOPIC = "questionAnswered"
     static final String TICK_TASK_NAME = "goals_daily_tick"
     static final LocalTime TICK_TIME_UTC = LocalTime.of(11, 7)
     static final String CREATED = "created"
@@ -33,20 +30,7 @@ class ProvisioningService {
     }
 
     Map<String, String> provision() {
-        [subscription: ensureSubscription(), schedule: ensureTickSchedule()]
-    }
-
-    String ensureSubscription() {
-        List subscriptions = new JsonSlurper().parseText(client.get("${EVENT_BASE_URL}/subscription".toString())) as List
-        if (subscriptions.any { it.name == SUBSCRIPTION_NAME }) {
-            return EXISTS
-        }
-        client.post("${EVENT_BASE_URL}/subscription".toString(), JsonOutput.toJson([
-                name : SUBSCRIPTION_NAME,
-                topic: ANSWERED_TOPIC,
-                url  : "${GOALS_BASE_URL}/api/event/questionAnswered".toString()
-        ]))
-        return CREATED
+        [schedule: ensureTickSchedule()]
     }
 
     String ensureTickSchedule() {

@@ -3,16 +3,13 @@ package com.trevorism.service
 import com.trevorism.model.Goal
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
-import com.trevorism.model.GoalPendingAsk
 import com.trevorism.model.dashboard.Dashboard
 import com.trevorism.model.dashboard.NeedsYouItem
 import com.trevorism.model.types.GoalStatusType
 import com.trevorism.model.types.MetricDirectionType
 import com.trevorism.model.types.MetricMeasuresType
-import com.trevorism.model.types.MetricSourceType
 import com.trevorism.model.types.MetricType
 import com.trevorism.model.types.NeedsYouType
-import com.trevorism.model.types.PendingAskStatusType
 import com.trevorism.support.TestStore
 import org.junit.jupiter.api.Test
 
@@ -29,8 +26,7 @@ class DashboardServiceTest {
 
     private final TestStore store = new TestStore()
     private final ProgressService progressService = new ProgressService(store.goalRepository, store.metricRepository, store.observationRepository, store.adjustmentRepository)
-    private final DashboardService service = new DashboardService(store.goalRepository, store.metricRepository, store.pendingAskRepository,
-            progressService, store.profileService())
+    private final DashboardService service = new DashboardService(store.goalRepository, store.metricRepository, progressService)
     private final Goal health = store.goalService().createRoot(OWNER, rootGoal())
 
     DashboardServiceTest() {
@@ -43,11 +39,6 @@ class DashboardServiceTest {
 
     private GoalMetric metric(Goal goal, Map properties) {
         store.metricService().create(OWNER, goal.id, new GoalMetric([name: "m"] + properties))
-    }
-
-    private void ask(GoalMetric metric, int dayOfYear, String status, String note = null) {
-        store.pendingAskRepository.create(OWNER, new GoalPendingAsk(metricId: metric.id, questionId: "q${dayOfYear}".toString(),
-                periodStart: day(dayOfYear), periodEnd: day(dayOfYear + 1), status: status, note: note))
     }
 
     private List<NeedsYouItem> needs(String type, Dashboard dashboard) {
@@ -89,37 +80,6 @@ class DashboardServiceTest {
     }
 
     @Test
-    void unreadableAnswersNeedYouUntilAValueIsRecordedForThatPeriod() {
-        GoalMetric weight = metric(health, [name: "Weight", source: MetricSourceType.PROMPT])
-        ask(weight, 100, PendingAskStatusType.INVALID, 'Couldn\'t read a number from "lots"')
-
-        NeedsYouItem item = needs(NeedsYouType.UNREADABLE_ANSWER, service.dashboard(OWNER, isoDay(101)))[0]
-        assert [item.title, item.detail, item.metricId, item.goalId, item.rootId, item.date] ==
-                ["Weight", 'Couldn\'t read a number from "lots"', weight.id, health.id, health.id, day(100)]
-
-        store.observationService().create(OWNER, weight.id, new GoalObservation(value: 190, observedAt: day(100)))
-        assert needs(NeedsYouType.UNREADABLE_ANSWER, service.dashboard(OWNER, isoDay(101))).isEmpty()
-    }
-
-    @Test
-    void threeOrMoreMissedQuestionsInARowNeedYou() {
-        GoalMetric walked = metric(health, [name: "Walked", type: MetricType.BOOLEAN, source: MetricSourceType.PROMPT])
-        GoalMetric sleep = metric(health, [name: "Sleep", type: MetricType.BOOLEAN, source: MetricSourceType.PROMPT])
-        [10, 11].each { ask(walked, it, PendingAskStatusType.ANSWERED) }
-        [12, 13, 14, 15].each { ask(walked, it, PendingAskStatusType.MISSED) }
-        ask(walked, 16, PendingAskStatusType.OPEN)
-        [12, 13].each { ask(sleep, it, PendingAskStatusType.MISSED) }
-        ask(sleep, 14, PendingAskStatusType.ANSWERED)
-        [15, 16].each { ask(sleep, it, PendingAskStatusType.MISSED) }
-
-        List<NeedsYouItem> missed = needs(NeedsYouType.MISSED_QUESTIONS, service.dashboard(OWNER, isoDay(16)))
-
-        assert missed*.title == ["Walked"]
-        assert missed[0].count == 4
-        assert missed[0].date == day(15)
-    }
-
-    @Test
     void activeGoalsPastTheirEndDateNeedYou() {
         Goal cardio = store.goalService().createChild(OWNER, health.id, new Goal(title: "Cardio", startDate: day(10), endDate: day(40)))
         Goal sleep = store.goalService().createChild(OWNER, health.id, new Goal(title: "Sleep", startDate: day(10), endDate: day(40)))
@@ -134,11 +94,9 @@ class DashboardServiceTest {
 
     @Test
     void closedGoalsDoNotNeedYou() {
-        GoalMetric weight = metric(health, [name: "Weight", source: MetricSourceType.PROMPT])
-        ask(weight, 100, PendingAskStatusType.INVALID, "unreadable")
-        [101, 102, 103].each { ask(weight, it, PendingAskStatusType.MISSED) }
+        store.goalService().createChild(OWNER, health.id, new Goal(title: "Cardio", startDate: day(10), endDate: day(40)))
         store.goalService().update(OWNER, health.id, new Goal(status: GoalStatusType.ABANDONED))
 
-        assert service.dashboard(OWNER, isoDay(366 - 1)).needsYou.isEmpty()
+        assert service.dashboard(OWNER, isoDay(41)).needsYou.isEmpty()
     }
 }

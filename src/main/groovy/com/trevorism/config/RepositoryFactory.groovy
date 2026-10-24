@@ -9,7 +9,6 @@ import com.trevorism.model.GoalAdjustment
 import com.trevorism.model.GoalDelegate
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
-import com.trevorism.model.GoalPendingAsk
 import com.trevorism.model.GoalProfile
 import com.trevorism.service.OwnedRepository
 import io.micronaut.context.annotation.Factory
@@ -35,12 +34,6 @@ class RepositoryFactory {
     @Named("metricStore")
     Repository<GoalMetric> metricStore(@Named("appClientSecureHttpClient") SecureHttpClient secureHttpClient) {
         new FastDatastoreRepository<GoalMetric>(GoalMetric, secureHttpClient)
-    }
-
-    @Singleton
-    @Named("pendingAskStore")
-    Repository<GoalPendingAsk> pendingAskStore(@Named("appClientSecureHttpClient") SecureHttpClient secureHttpClient) {
-        new FastDatastoreRepository<GoalPendingAsk>(GoalPendingAsk, secureHttpClient)
     }
 
     @Singleton
@@ -83,12 +76,6 @@ class RepositoryFactory {
     @Named("adjustment")
     OwnedRepository<GoalAdjustment> adjustmentRepository(@Named("appClientSecureHttpClient") SecureHttpClient secureHttpClient) {
         new OwnedRepository<GoalAdjustment>(new FastDatastoreRepository<GoalAdjustment>(GoalAdjustment, secureHttpClient), "Adjustment")
-    }
-
-    @Singleton
-    @Named("pendingAsk")
-    OwnedRepository<GoalPendingAsk> pendingAskRepository(@Named("pendingAskStore") Repository<GoalPendingAsk> store) {
-        new OwnedRepository<GoalPendingAsk>(store, "Pending ask")
     }
 
     @Singleton

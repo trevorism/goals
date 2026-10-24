@@ -11,7 +11,7 @@ Goals turns long-term intentions into outcomes. Each goal goes through a loop:
 2. **Decompose** it into sub-goals, and decompose those until each leaf is a concrete step that can
    be done within about a week.
 3. **Measure** progress at every level, with numeric and qualitative metrics. Measurements are
-   collected by hand, by asking the user through `prompt`, or automatically.
+   recorded by hand in goals, or measured automatically. Goals is the one place values are recorded.
 4. **Learn:** compare progress with the plan, record adjustments (behavior changes), and see which
    changes moved the trend.
 5. **Automate** steps one level at a time, from "I do this" toward "the platform does this". A goal
@@ -27,7 +27,9 @@ tree is working.
   outcome stays flat, the decomposition is wrong. The UI shows both numbers.
 - **The human approves structure and spend.** The system can propose sub-goals and actions. Nothing
   is created, sent or paid for without approval, unless the user has explicitly automated that step.
-- **Use the platform.** Use the `prompt`, `schedule`, `event`, `email`, `chat` and datastore services
+- **One place to record.** Every value is entered in goals or measured by goals. Goals doesn't send
+  questions to another app to be answered there, so a value is never recorded in two places.
+- **Use the platform.** Use the `schedule`, `event`, `email`, `chat` and datastore services
   rather than building parallel mechanisms.
 - **Start as one service, and keep the split possible.** Collection and measurement sit behind
   interfaces, so a later `measure` service can be extracted by moving code.
@@ -41,7 +43,7 @@ These three goals are test cases for every phase. Each one exercises a different
 ### 2.1 Build the goals application (outcome, ends 2027-03-31)
 - Lag metrics:
   - `phases shipped`: numeric, 0 → 5, collected by hand.
-  - `days I used goals this week`: numeric, target ≥ 5, asked weekly through prompt.
+  - `days I used goals this week`: numeric, target ≥ 5, recorded weekly.
 - Children:
   - Phase 1 goal tree (milestone). Its steps are PRs 1a–1d (section 12). Step metric: done.
   - Phase 2 collection (milestone).
@@ -59,7 +61,7 @@ These three goals are test cases for every phase. Each one exercises a different
   - `energy`: scale 1–5, daily.
 - Children:
   - **Cardio base** (milestone)
-    - Step: walk 30 minutes per day (`boolean`, target rate 6/7, asked daily through prompt).
+    - Step: walk 30 minutes per day (`boolean`, target rate 6/7, recorded daily).
     - Step: zone 2 training 3×/week (`boolean`, weekly target 3).
   - **Sleep** (milestone)
     - Metric: `sleep quality` (scale 1–5).
@@ -68,7 +70,7 @@ These three goals are test cases for every phase. Each one exercises a different
     - Metric: `meal quality` (choice: poor / ok / good, scored 0 / 0.5 / 1).
 - Adjustments, for example "started walking after lunch" or "moved caffeine before noon". These are
   the test cases for segmented fits.
-- Automation: health metrics start at the `reminded` level. A future health data source (e.g. a
+- Automation: health metrics start at the `manual` level. A future health data source (e.g. a
   health-dash feed) moves them to `measured`.
 
 ### 2.3 Get paying customers on the Trevorism platform (outcome, ends 2027-06-30)
@@ -83,8 +85,9 @@ These three goals are test cases for every phase. Each one exercises a different
   - Landing page on `homepage` (milestone).
   - Outreach (milestone). Step: contact 5 prospects per week (numeric, weekly). The `approved`
     automation drafts outreach emails through `chat`, and the user approves each one through a
-    prompt approval before `email` sends it.
-- This goal is the main test case for the automation ladder and its guardrails.
+    prompt approval before `email` sends it (deferred, see section 12).
+- This goal is the main test case for the automation ladder and its guardrails, once an offer is
+  chosen.
 
 ## 3. Architecture
 
@@ -93,8 +96,8 @@ These three goals are test cases for every phase. Each one exercises a different
  browser ── /api/auth ─┤ ui-auth session │ goal │ measurement │ analysis │ decompose │ automation │ notify │
                        └──────┬──────────────┬───────────┬───────────┬──────────┬──────────┬─────────┘
                               │              │           │           │          │          │
-                       datastore svc     prompt svc   event svc   chat svc   schedule   email svc
-                       (all entities)   (ask/approve) (subscribe) (decompose) (daily tick)
+                       datastore svc    billing svc   event svc   chat svc   schedule   email svc
+                       (all entities)   (measured)    (subscribe) (decompose) (daily tick)
 ```
 
 - **One service, `goals`:**
@@ -129,7 +132,7 @@ datastore-client matches them case-insensitively. The tables below use the store
 - **Unknown ids:** datastore returns a 500 for an unknown id, so `OwnedRepository` turns it into a 404.
 
 Every entity is **flat**: fields are strings, numbers, dates and booleans. The only lists are
-`GoalMetric.choices`, which follows prompt's `Choice {value, label}` convention, and
+`GoalMetric.choices`, a list of `Choice {value, label}`, and
 `GoalAdjustment.metricIds`, a list of strings. Every string indicator is a plain `String` field whose
 allowed values are listed in a values class (constants plus an `ALL` list), checked on create and update.
 Values classes live in `com.trevorism.model.types` and end in `Type`, so they're easy to tell apart
@@ -142,7 +145,7 @@ from stored entities:
 | `MetricMeasuresType` | `GoalMetric.measures` | `outcome` (lag) \| `effort` (lead) |
 | `MetricDirectionType` | `GoalMetric.direction` | `increase` \| `decrease` \| `maintain` |
 | `FrequencyType` | `GoalMetric.frequency` | `daily` \| `weekly` \| `monthly` |
-| `MetricSourceType` | `GoalMetric.source`, `GoalObservation.source` | `manual` \| `prompt` \| `http` \| `event` \| `aggregation` |
+| `MetricSourceType` | `GoalMetric.source`, `GoalObservation.source` | `manual` \| `http` \| `event` \| `aggregation` (observations from before 0.11.0 may say `prompt`) |
 | `AdjustmentCategoryType` | `GoalAdjustment.category` | `habit` \| `tool` \| `environment` \| `plan` \| `other` |
 
 ### 4.1 Goal (the tree node)
@@ -172,7 +175,7 @@ from stored entities:
 | direction | `MetricDirectionType`; numeric and scale only; `increase` by default |
 | baseline, target, tolerance | For a boolean metric, `target` is the required share of yes answers, e.g. 0.857 (6/7), in (0, 1]. `tolerance` is required for `maintain`. |
 | scalemin, scalemax | scale only |
-| choices | `[{value, label}]`, as in prompt. A missing value is derived from the label (`"Just OK"` → `just-ok`) and made unique. Boolean metrics always get `yes`/`no`. |
+| choices | `[{value, label}]`. A missing value is derived from the label (`"Just OK"` → `just-ok`) and made unique. Boolean metrics always get `yes`/`no`. |
 | frequency | `FrequencyType`; `daily` by default |
 | source | `MetricSourceType`; `manual` by default |
 | measurementid | With `source = http`, the id of a measurement in the catalog (section 8.3). The metric's type must match the measurement's. Cleared (set to empty) when the source changes to anything else. |
@@ -184,19 +187,18 @@ from stored entities:
 | id, ownerid, metricid | |
 | observedat | The date the value applies to. For a daily habit this is the day, not when it was answered. |
 | value | Number: the numeric value, 1/0 for boolean, the scale point, or the choice's position (for charting). Empty for text. |
-| choice | Boolean and choice metrics: the selected choice's value, matching prompt's `selectedChoices` |
+| choice | Boolean and choice metrics: the selected choice's value |
 | label | The selected choice's label, or the text answer |
 | note | |
-| metricsource, sourceref | `metricsource` is how the value was collected (`MetricSourceType`); `sourceref` is the id of the record it came from, e.g. `prompt` + answerId. Manual entries have no `sourceref`. |
-| missed | `true` for a period nobody answered |
+| metricsource, sourceref | `metricsource` is how the value was collected (`MetricSourceType`); `sourceref` is the id of the record it came from, e.g. `http` + the measurement id. Manual entries have no `sourceref`. |
+| missed | `true` for a period nobody answered (only from prompt collection before 0.11.0) |
 
 ### 4.4 Adjustment
 `id, ownerid, goalid, metricids[] (empty = all metrics in the subtree), effectivedate, title,
 description, category (AdjustmentCategoryType; other by default)`
 
-### 4.5 PendingAsk
-`id, ownerid, metricid, questionid, periodstart, periodend, status (open|answered|missed|invalid),
-createddate`
+### 4.5 PendingAsk (removed)
+Tracked prompt questions until 0.11.0. Existing `goalpendingask` records are no longer read.
 
 ### 4.6 AutomationRun
 `id, ownerid, goalid, metricid?, actionid, startedat, finishedat,
@@ -224,7 +226,7 @@ scored metric produces a **progress score p ∈ [0, 1]**. `ProgressCalculator` c
 | choice | choices, ordered worst to best | Mean of position ÷ (choices − 1) over the last 7 answers | Answers on a worst→best axis |
 | text | free text | Not scored | None; the journal list under the card |
 
-Missed observations and observations dated in the future are ignored, except that a missed yes/no period
+Missed observations (left from prompt collection) and observations dated in the future are ignored, except that a missed yes/no period
 counts as No.
 
 ### Expected progress
@@ -255,66 +257,30 @@ counts as No.
   `POST /api/collect/tick`, secured with `@Secure(value = Roles.SYSTEM, allowInternal = true)`. Schedule
   calls back with an internal token.
 - The tick is idempotent; running it twice in a period does nothing new. It:
-  1. Marks every open `GoalPendingAsk` whose period has ended as `missed`, and records a missed
-     observation for its period (`metricsource = prompt`, `sourceref` = the question id).
-  2. For every enabled metric with `source = prompt` whose goal and ancestors are active and whose
-     goal dates include today, asks one question for the current period in the owner's timezone. It
-     skips the metric when a question was already asked for that period, or a value is already
-     recorded for it (from `lastobservedat`).
-  3. For every enabled metric with `source = http` under the same conditions, reads its catalogued
-     measurement (section 8.3) and records the value for the current period (`metricsource = http`,
-     `sourceref` = the measurement id). Each measurement is read at most once per tick, however many
-     metrics use it; when that read fails, every metric using it fails for the tick without another read. It skips the metric when the period already has a value.
-  4. Returns counts: `asked`, `measured`, `alreadyRecorded`, `missed`, `failed`. A failure on one
-     metric doesn't stop the others, and a failed measurement is retried at the next tick.
-- One daily tick supports daily, weekly and monthly metrics without a schedule task per metric. A
-  question goes out at the first tick of its period: daily questions at 11:07 UTC, weekly ones on
-  Monday, monthly ones on the 1st.
+  1. For every enabled metric with `source = http` whose goal and ancestors are active and whose goal
+     dates include today, reads its catalogued measurement (section 8.3) and records the value for the
+     current period in the owner's timezone (`metricsource = http`, `sourceref` = the measurement id).
+     Each measurement is read at most once per tick, however many metrics use it; when that read
+     fails, every metric using it fails for the tick without another read. It skips the metric when
+     the period already has a value.
+  2. Returns counts: `measured`, `alreadyRecorded`, `failed`. A failure on one metric doesn't stop the
+     others, and a failed measurement is retried at the next tick.
+- One daily tick supports daily, weekly and monthly metrics without a schedule task per metric.
 - **Provisioning:** `POST /api/collect/provision` (`Roles.SYSTEM`) creates the `goals_daily_tick`
-  schedule task and the `goals-question-answered` subscription if they don't exist. It's run once
-  against production with goals' app credentials. PR environments are never provisioned, because
-  they share production's datastore and a second subscription would double-deliver answers.
+  schedule task if it doesn't exist. It's run once against production with goals' app credentials.
+  PR environments are never provisioned, because they share production's datastore.
 
 ### 6.2 Sources
+
+`prompt` was a source until 0.11.0: the tick asked a private question in prompt and recorded the
+answer. It was removed because the same value could then be recorded in two places. Metrics that used
+it were switched to `manual`.
+
 | Source | Behavior |
 |---|---|
 | `manual` | Does nothing. The metric shows on the Today page until a value is recorded. |
-| `prompt` | The tick asks a private question in prompt (see 6.3). The metric also shows on Today, so it can be entered by hand; whichever value arrives first wins. |
 | `http` | The tick reads the metric's `measurementid` from the measurement catalog (section 8.3) once per period. The metric doesn't show on Today, but a value can still be entered by hand on the goal page. |
 | `event`, `aggregation` | Later in phase 5, when a real metric needs them. Choosing them does nothing yet. |
-
-### 6.3 Prompt integration
-- **Question:** `targetIdentityId` = the owner, `privateQuestion = true` (only goals and the owner can
-  see it), `kind = question`, `dueDate` = the end of the period in the owner's timezone.
-  - Choices: yes/no and choice metrics use their own choice values. Scale metrics offer each point
-    (`"1"`..`"5"`). Numeric metrics ask with `answerType: number` and their `unit`, so prompt shows a
-    number input and stores a numeric `value`. Text metrics take a free-text answer.
-  - Text: the metric's `prompttext`, or "Goal title: metric name (unit)", then the period ("Sat,
-    Oct 3", "week of Oct 5", "October 2026"). Text questions add "Reply in your own words."
-  - The question is tracked by a `GoalPendingAsk`: `metricid`, `questionid`, `answerid`,
-    `periodstart`, `periodend`, `status` (`PendingAskStatusType`: `open`, `answered`, `missed`,
-    `invalid`), `note`.
-- **Answers:** prompt publishes `questionAnswered`, and the `goals-question-answered` subscription
-  pushes it to `POST /api/event/questionAnswered`. That route takes
-  `@Secure(value = Roles.USER, allowInternal = true)`, because the push forwards the answering user's
-  token.
-  - **The event body is never trusted.** Goals uses only its `questionId` and `answerId`. It ignores
-    the event unless an open ask has that question, then reads the answer from prompt with its own
-    token. It records nothing unless that answer belongs to the question and was written by the
-    ask's owner.
-  - Choice answers use the selected choice. Scale answers use the selected point. Numeric answers use
-    the answer's `value`, or the first number in the text for answers written before prompt 1.3.0
-    ("about 1,204.5" → 1204.5). Text answers use the text.
-  - The value is dated to the start of the asked period. If the period already has a value, the ask
-    is closed as answered and nothing is added. Unreadable answers, or values the metric rejects,
-    close the ask as `invalid` with a note.
-  - The route always answers 200 for events it ignores, so Pub/Sub doesn't retry them.
-    `questionOverdue` isn't subscribed; the tick's expiry handles missed periods.
-- **Prompt 1.3.0 (phase 2b):** Question has `answerType` (`text` | `number`), `unit`, `minValue` and
-  `maxValue`. Number answers are validated by prompt and carry a numeric `value`.
-- **Profile:** `GoalProfile` (`ownerid`, `timezone`) holds the owner's IANA timezone. The UI saves the
-  browser's timezone once per session when it differs, through `PUT /api/profile`. Email and digest
-  settings join it in phase 4.
 
 ## 7. Analysis
 
@@ -363,13 +329,16 @@ and the emails always agree. The response is two flat lists:
 ## 8. Automation
 
 ### 8.1 The automation ladder
+The `approved` and `automated` rungs (sections 8.2 and 8.3's action rows) are deferred until a real
+step needs them (section 12); the measurement catalog is live. When 5b is picked up, approvals
+should follow the one-place principle (section 1) rather than move into prompt as sketched below.
+
 Phase 5 adds flat automation fields to `Goal` (for example `automationlevel`, `automationaction`), with an
 `AutomationLevelType` values class.
 
 | Level | Meaning | How it works |
 |---|---|---|
-| `manual` | The user does the work and records it. | UI |
-| `reminded` | The user is asked or reminded on a schedule. | tick → prompt question |
+| `manual` | The user does the work and records it in goals. The Today page lists what's due. | UI |
 | `measured` | Progress data arrives automatically; the user still does the work. | `http`, `event` and `aggregation` sources |
 | `approved` | The system prepares an action and the user approves each run. | prompt question with `kind=approval`, then `approvalDecided` → execute |
 | `automated` | The system does the work and records the result. | tick or event → action → observation |
@@ -388,7 +357,7 @@ Phase 5 adds flat automation fields to `Goal` (for example `automationlevel`, `a
      run to `approved` or `rejected`.
 3. Execute the catalogued action with goals' app token, then record `resultsummary`, plus an
    observation if the action produces one.
-4. On failure, increment `consecutivefailures`. After 3 failures, drop the node to `reminded` and
+4. On failure, increment `consecutivefailures`. After 3 failures, drop the node to `manual` and
    email the owner, so a broken automation never stalls silently.
 
 ### 8.3 Action catalog
@@ -439,8 +408,8 @@ user-supplied kind or path would let any user read another app's data through go
 - **Every** route has an explicit `@Secure`, because `@Secure` is fail-open:
   - User routes: `@Secure(Roles.USER)`.
   - Tick: `@Secure(value = Roles.SYSTEM, allowInternal = true)`.
-  - Event receivers: `@Secure(value = Roles.USER, allowInternal = true)`, and they re-verify the data
-    against its source.
+  - Event receivers, when there are any: `@Secure(value = Roles.USER, allowInternal = true)`, and
+    they re-verify the data against its source.
 - **Ownership:** all persistence goes through `OwnedRepository<T>`, which sets `ownerid` from the
   token on create, filters lists by `ownerid`, and returns 404 (not 403) for other users' ids on
   get, update and delete.
@@ -478,15 +447,12 @@ alert emails**. Status lives on an in-app dashboard that the owner opens when th
     shows effort progress or a hint to add a metric.
   - Active goals come first, ordered by end date. Closed goals are a short list at the bottom.
 - **Needs you:** a strip that appears only when something is stuck (`NeedsYouType`):
-  - `unreadable_answer`: a prompt answer goals couldn't record, until a value is recorded for that
-    period;
-  - `missed_questions`: a prompt metric whose 3 most recent questions or more all went unanswered;
   - `past_end_date`: an active goal or sub-goal whose end date has passed.
 
   Closed goals never show up here.
 - **Later, opt-in per goal:** an attention setting, quiet (the default) or nudge. Nudge is for
   exceptions such as a blocker, or the one manual step left when everything else is automated; it
-  would reach the owner through prompt or email. It arrives with the automation ladder (phase 5), when
+  would reach the owner by email. It arrives with the automation ladder (phase 5), when
   that step becomes detectable.
 - **Goal events** (`goalStatusChanged`, `goalAchieved`, `stepCompleted`) wait until something consumes
   them.
@@ -510,17 +476,16 @@ alert emails**. Status lives on an in-app dashboard that the owner opens when th
 | `GET /measurement` | The catalogued measurements the caller may attach to a metric (section 8.3) |
 | `PUT /goal/{id}/automation`, `GET /goal/{id}/automation/run` | Automation settings and run log |
 | `GET /dashboard?date=yyyy-MM-dd` | Every root goal's status and headline, plus needs-you items |
-| `GET /today?date=yyyy-MM-dd` | Metrics with nothing recorded in their current day, week or month, for the caller's local date (phase 1: manual metrics only; missed, invalid and approvals come in phases 2 and 5) |
+| `GET /today?date=yyyy-MM-dd` | Metrics with nothing recorded in their current day, week or month, for the caller's local date (manual metrics) |
 | `POST /collect/tick` | Daily tick (SYSTEM or internal) |
-| `POST /collect/provision` | Create the tick schedule and answer subscription (SYSTEM) |
+| `POST /collect/provision` | Create the tick schedule (SYSTEM) |
 | `GET/POST /delegate`, `DELETE /delegate/{id}` | The owner's delegates (owner-only) |
 | `GET /delegate/granted` | Owners who granted the caller access; then use `?onBehalfOf=<ownerId>` |
 | `GET/PUT /profile` | The owner's timezone (email and digest settings in phase 4) |
-| `POST /event/questionAnswered`, `/event/questionOverdue`, `/event/approvalDecided`, `/event/topic/{topic}` | Event receivers |
 
 ### 11.2 UI screens
-- **Today:** what's due now (one-tap boolean, scale and choice entry), missed and invalid answers,
-  and approvals waiting. This is the daily-use screen.
+- **Today:** what's due now, with one-tap boolean, scale and choice entry. This is the daily-use
+  screen and the one place values are recorded.
 - **Goals:** root goal cards with outcome and effort progress, status, end date and automated
   coverage.
 - **Goal detail:**
@@ -556,34 +521,48 @@ tests in its PR environment.
 - 1d. Adjustments in the UI and on the charts; segmented fits; the Today view (manual items only).
 - **Done when** the three dogfood goals are entered and you're recording values by hand.
 
-**Phase 2: collection**
-- 2a. Profile (captured from `/user/me`); the daily tick; the frequency engine; the `prompt` source;
-  PendingAsk; event subscriptions; missed handling.
+**Phase 2: collection** (prompt collection shipped in 0.6.0–0.7.0, removed in 0.11.0)
+- 2a. Profile; the daily tick; the frequency engine; the `prompt` source; PendingAsk; event
+  subscriptions; missed handling.
 - 2b. A PR to `prompt` for the numeric answer type, and goals uses it.
-- **Done when** healthspan habits are answered through prompt and appear on the charts without being
-  entered by hand.
+- Removed in 0.11.0: asking in prompt gave every metric two places to be recorded. The profile, the
+  frequency engine and the daily tick stay; the tick now only measures (section 6.1).
 
 **Phase 3: dropped.** Breakdown happens outside the app (section 11.3).
 - **Done when** "Get paying customers" has been broken down to steps with assistance.
 
 **Phase 4: quiet dashboard** (section 10): the home page shows every goal's status, and a needs-you strip appears only when something is stuck. No emails.
 
-**Phase 5: automation ladder**
-- 5a. `measured`, in slices:
-  - 5a-1. The measurement catalog and the `http` source, collected by the tick. Its one entry is
-    billing's paying customers, so the paying-customers metric (moved to the root goal) comes from
-    billing.
+**Phase 5: make recording nearly free**
+
+Revised 2026-10-24. A week after 5a-1 shipped, nothing had been recorded for 7 days, and the
+paying-customers metric still read nothing. Recording friction is the main risk to the app, so the
+ladder's lower rungs come first. The upper rungs wait for a step that needs them.
+- 5a. `measured`, and one place to record, in slices:
+  - 5a-1 (shipped in 0.10.0). The measurement catalog and the `http` source, collected by the tick.
+    Its one entry is billing's paying customers. **Done when** the paying-customers metric is moved
+    to the root goal (its current goal starts 2027-04-01, so the tick would skip it) and switched to
+    `billing.paying-customers` by its admin owner, and a tick logs `measured 1`.
+  - 5a-2 (0.11.0). Remove prompt collection, so every value is recorded in goals (Today and the goal
+    page) or measured. **Done when** the metrics that used prompt are `manual`, the
+    `goals-question-answered` subscription is deleted, and everything due is recorded on Today for
+    two weeks.
   - Later: the `aggregation` and `event` sources, each when a real metric needs it.
   - The `Goal` automation fields wait for 5b, when approvals first need them. Until then a node's
     `measured` level follows from its metrics' sources.
-- 5b. `approved`: prompt approvals and AutomationRun. Outreach is drafted with `chat`, approved, then
-  sent with `email`.
-- 5c. `automated`: unattended actions, failure fallback and automated-coverage reporting.
+- **Deferred:** 5b and 5c, until a real step needs them (as with `aggregation` and `event` above).
+  - 5b. `approved`: approvals and AutomationRun. The outreach example waits for a chosen offer:
+    "Get in front of people" starts 2027-01-01, and approved cold email is still a reputational risk.
+  - 5c. `automated`: unattended actions, failure fallback and automated-coverage reporting. Most
+    current goals (weight, family, choosing an offer) can never be satisfied by the platform, so
+    automated coverage would mostly measure this app's own goal.
 
 **Later:**
-- Public and shared goals, with accountability partners as prompt targets.
+- Public and shared goals, with accountability partners.
 - Extract `measure` as a separate service.
-- Health data integrations.
+- Health data integrations, the next step for `measured` personal metrics such as weight and
+  workouts. No platform service holds personal health data yet (`health-dash` monitors the
+  platform), so this needs an external feed.
 - A weekly reflection written by Claude.
 - Goal templates.
 
@@ -594,9 +573,8 @@ Checked 2026-10-03 against the code and the live services:
 1. **Goals' app token:** role `system`, no permissions claim, not admin. Routes marked
    `@Secure(Roles.USER)` accept any role except `internal`, and permission letters are enforced only
    when the token has a permissions claim. So goals can call every USER and SYSTEM route below.
-2. **Prompt:** goals can create a private question targeted at a user (it shows in the user's pending
-   list), and as the asker it can read the answers. Prompt publishes events with the pass-through
-   client, so `questionAnswered` carries the answering user's token.
+2. **Prompt** (no longer used since 0.11.0): goals could create a private question targeted at a user
+   and read the answers as the asker.
 3. **Event:** `POST /subscription` accepts USER. **Schedule:** `POST /api/schedule` accepts USER.
    **Email:** `POST /mail` accepts USER or internal tokens.
 4. **Auth:** `GET /user/me` needs a user token with the `R` permission, so phase 4 reads the email
@@ -609,7 +587,7 @@ Checked 2026-10-03 against the code and the live services:
 
 | Risk | Mitigation |
 |---|---|
-| Too many prompt questions makes users stop answering | Group a period's due asks into one choice question where possible; show answer rate in the digest |
+| The owner stops recording | One place to record (Today), one-tap entry for yes/no, scale and choice metrics, and `measured` sources wherever a metric can be read automatically |
 | Misleading fits on sparse or noisy data | Minimum n, show r² and n, label correlation vs causation |
 | Automations misusing goals' identity | Code-defined catalog, approvals for outward or write actions, run limits, audit log |
 | The decomposition tree grows too deep | Concreteness check; warn past depth 4 |

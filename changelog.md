@@ -1,3 +1,11 @@
+## 0.11.0
+
+- Goals no longer asks questions in prompt. Every value is recorded in goals, on the Today page or the goal page, or measured automatically, so there is one place to record each metric.
+- "Ask me in prompt" is gone from the metric form. Metrics that used it open as "I enter it myself", and they show on Today when due.
+- The "Needs you" strip keeps goals past their end date; the unreadable-answer and unanswered-questions items went with prompt.
+- The daily tick now only records measured metrics. `POST /api/collect/provision` only creates the tick schedule, and `POST /api/event/questionAnswered` is removed.
+- Values already recorded through prompt stay in each metric's history.
+
 ## 0.10.0
 
 - Metrics can be measured automatically: choose "Measured automatically" and pick a measurement, and the daily tick records its value once per day, week or month. Measured metrics stay off the Today page.

@@ -70,8 +70,7 @@ export function buildMetricPayload(form) {
     type: form.type,
     measures: form.measures,
     frequency: form.frequency,
-    source: form.source,
-    promptText: form.source === MetricSourceType.PROMPT ? form.promptText?.trim() ?? '' : ''
+    source: form.source
   }
   if (form.source === MetricSourceType.HTTP) {
     payload.measurementId = form.measurementId
@@ -141,8 +140,7 @@ export function metricFormFrom(metric) {
     type: metric?.type ?? MetricType.NUMERIC,
     measures: metric?.measures ?? 'outcome',
     frequency: metric?.frequency ?? 'daily',
-    source: metric?.source ?? MetricSourceType.MANUAL,
-    promptText: metric?.promptText ?? '',
+    source: metric?.source === MetricSourceType.HTTP ? MetricSourceType.HTTP : MetricSourceType.MANUAL,
     measurementId: metric?.measurementId ?? '',
     direction: metric?.direction ?? MetricDirectionType.INCREASE,
     unit: metric?.unit ?? '',

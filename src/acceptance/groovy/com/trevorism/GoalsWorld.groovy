@@ -32,7 +32,6 @@ class GoalsWorld {
     Map numericMetric
     List todayItems
     Map profile
-    Map eventOutcome
     Map dashboard
     Map delegate
     List measurements
@@ -108,10 +107,6 @@ class GoalsWorld {
 
     Map updateProfile(String timezone) {
         profile = gson.fromJson(authClient.put("${BASE_URL}/api/profile".toString(), gson.toJson([timezone: timezone])), Map)
-    }
-
-    Map sendAnsweredEvent(Map event) {
-        eventOutcome = postJson("api/event/questionAnswered", event)
     }
 
     void attemptAuthenticatedPut(String path, Map body) {
