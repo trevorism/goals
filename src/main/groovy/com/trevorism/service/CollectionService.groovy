@@ -53,8 +53,21 @@ class CollectionService {
     private void measureDueMetrics(CollectionResult result) {
         Map<String, Double> readings = [:]
         Map<String, Exception> readFailures = [:]
-        eachEnabledMetric(MetricSourceType.HTTP, result) { GoalMetric metric, Map<String, Goal> goalsById, ZoneId zone, LocalDate today ->
-            measureIfDue(metric, goalsById, zone, today, { String measurementId -> readOnce(measurementId, readings, readFailures) }, result)
+        List<GoalMetric> measuredMetrics = metricStore.filter(new SimpleFilter("source", FilterConstants.OPERATOR_EQUAL, MetricSourceType.HTTP))
+                .findAll { it.enabled != false }
+        measuredMetrics.groupBy { it.ownerId }.each { String ownerId, List<GoalMetric> metrics ->
+            Map<String, Goal> goalsById = goalStore.filter(new SimpleFilter(OwnedRepository.OWNER_FIELD, FilterConstants.OPERATOR_EQUAL, ownerId))
+                    .collectEntries { [it.id, it] }
+            ZoneId zone = profileService.zoneFor(ownerId)
+            LocalDate today = LocalDate.now(clock.withZone(zone))
+            metrics.each { GoalMetric metric ->
+                try {
+                    measureIfDue(metric, goalsById, zone, today, { readOnce(metric.measurementId, readings, readFailures) }, result)
+                } catch (Exception e) {
+                    result.failed++
+                    log.warn("Unable to measure metric ${metric.id}: ${e.message}")
+                }
+            }
         }
     }
 
@@ -73,25 +86,6 @@ class CollectionService {
         readings[measurementId]
     }
 
-    private void eachEnabledMetric(String source, CollectionResult result, Closure collect) {
-        List<GoalMetric> sourceMetrics = metricStore.filter(new SimpleFilter("source", FilterConstants.OPERATOR_EQUAL, source))
-                .findAll { it.enabled != false }
-        sourceMetrics.groupBy { it.ownerId }.each { String ownerId, List<GoalMetric> metrics ->
-            Map<String, Goal> goalsById = goalStore.filter(new SimpleFilter(OwnedRepository.OWNER_FIELD, FilterConstants.OPERATOR_EQUAL, ownerId))
-                    .collectEntries { [it.id, it] }
-            ZoneId zone = profileService.zoneFor(ownerId)
-            LocalDate today = LocalDate.now(clock.withZone(zone))
-            metrics.each { GoalMetric metric ->
-                try {
-                    collect(metric, goalsById, zone, today)
-                } catch (Exception e) {
-                    result.failed++
-                    log.warn("Unable to collect ${source} metric ${metric.id}: ${e.message}")
-                }
-            }
-        }
-    }
-
     private void measureIfDue(GoalMetric metric, Map<String, Goal> goalsById, ZoneId zone, LocalDate today,
                               Closure<Double> read, CollectionResult result) {
         if (!isOpen(goalsById[metric.goalId], goalsById, today)) {
@@ -102,7 +96,7 @@ class CollectionService {
             result.alreadyRecorded++
             return
         }
-        observationService.create(metric.ownerId, metric.id, new GoalObservation(value: read(metric.measurementId),
+        observationService.create(metric.ownerId, metric.id, new GoalObservation(value: read(),
                 observedAt: period.observedAt(), metricSource: MetricSourceType.HTTP, sourceRef: metric.measurementId))
         result.measured++
     }
