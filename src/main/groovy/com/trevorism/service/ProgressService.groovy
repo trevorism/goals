@@ -9,7 +9,7 @@ import jakarta.inject.Named
 import jakarta.inject.Singleton
 
 import java.time.Clock
-import java.time.LocalDate
+import java.time.Instant
 
 @Singleton
 class ProgressService {
@@ -48,8 +48,8 @@ class ProgressService {
         Set<String> treeIds = wholeTree*.id as Set
         List<GoalAdjustment> adjustments = adjustmentRepository.list(ownerId).findAll { it.goalId in treeIds }
         Map<String, List<GoalAdjustment>> adjustmentsByMetric = AdjustmentScope.byMetric(metrics, adjustments, wholeTree)
-        LocalDate ownersToday = LocalDate.now(clock.withZone(profileService.zoneFor(ownerId)))
-        new ProgressCalculator(Date.from(clock.instant()), ownersToday).calculate(top, subtree, metrics, observations, adjustmentsByMetric)
+        Instant now = clock.instant()
+        new ProgressCalculator(Date.from(now), profileService.localDate(ownerId, now)).calculate(top, subtree, metrics, observations, adjustmentsByMetric)
     }
 
     private static List<Goal> descendants(Goal top, List<Goal> treeGoals) {

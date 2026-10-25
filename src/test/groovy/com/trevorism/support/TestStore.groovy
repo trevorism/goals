@@ -49,7 +49,7 @@ class TestStore {
     }
 
     AdjustmentService adjustmentService() {
-        new AdjustmentService(goalRepository, metricRepository, adjustmentRepository)
+        new AdjustmentService(goalRepository, metricRepository, adjustmentRepository, profileService())
     }
 
     static Date day(int dayOfYear) {

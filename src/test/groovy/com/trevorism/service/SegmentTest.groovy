@@ -88,6 +88,18 @@ class SegmentTest {
     }
 
     @Test
+    void testAnAdjustmentStampedEarlierTodaySplitsTheHistoryWestOfUtc() {
+        GoalMetric weight = new GoalMetric(id: "w", goalId: "g", type: MetricType.NUMERIC, direction: MetricDirectionType.DECREASE)
+        Date now = new Date(day(60).time + 2 * 3600 * 1000)
+        ProgressCalculator eveningWestOfUtc = new ProgressCalculator(now, START.plusDays(59))
+        GoalAdjustment stampedAnHourAgo = new GoalAdjustment(id: "a", goalId: "g", title: "change a", effectiveDate: new Date(now.time - 3600 * 1000))
+
+        List<MetricSegment> segments = eveningWestOfUtc.segments(weight, goal, line(40..59, 200d, -0.2d), [stampedAnHourAgo])
+
+        assert segments*.adjustmentId == [null, "a"]
+    }
+
+    @Test
     void testYesNoSegmentsCountOnlyRecordedDays() {
         GoalMetric walked = new GoalMetric(id: "y", goalId: "g", type: MetricType.BOOLEAN, frequency: FrequencyType.DAILY)
         List<GoalObservation> answers = ((40..49).step(2) + (50..54)).collect { new GoalObservation(observedAt: day(it), value: 1d) }

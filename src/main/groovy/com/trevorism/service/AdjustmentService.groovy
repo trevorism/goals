@@ -7,6 +7,8 @@ import com.trevorism.model.types.AdjustmentCategoryType
 import jakarta.inject.Named
 import jakarta.inject.Singleton
 
+import java.time.Clock
+
 import static com.trevorism.service.Validation.require
 import static com.trevorism.service.Validation.requireOneOf
 
@@ -16,13 +18,17 @@ class AdjustmentService {
     private final OwnedRepository<Goal> goalRepository
     private final OwnedRepository<GoalMetric> metricRepository
     private final OwnedRepository<GoalAdjustment> adjustmentRepository
+    private final ProfileService profileService
+    Clock clock = Clock.systemUTC()
 
     AdjustmentService(@Named("goal") OwnedRepository<Goal> goalRepository,
                       @Named("metric") OwnedRepository<GoalMetric> metricRepository,
-                      @Named("adjustment") OwnedRepository<GoalAdjustment> adjustmentRepository) {
+                      @Named("adjustment") OwnedRepository<GoalAdjustment> adjustmentRepository,
+                      ProfileService profileService) {
         this.goalRepository = goalRepository
         this.metricRepository = metricRepository
         this.adjustmentRepository = adjustmentRepository
+        this.profileService = profileService
     }
 
     List<GoalAdjustment> listForGoal(String ownerId, String goalId) {
@@ -34,7 +40,7 @@ class AdjustmentService {
         Goal goal = goalRepository.get(ownerId, goalId)
         adjustment.goalId = goal.id
         adjustment.metricIds = adjustment.metricIds ?: []
-        adjustment.effectiveDate = adjustment.effectiveDate ?: new Date()
+        adjustment.effectiveDate = adjustment.effectiveDate ?: profileService.localDayStart(ownerId, clock.instant())
         adjustment.category = adjustment.category ?: AdjustmentCategoryType.OTHER
         adjustment.createdDate = new Date()
         validate(ownerId, goal, adjustment)

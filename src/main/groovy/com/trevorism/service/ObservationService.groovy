@@ -9,8 +9,6 @@ import jakarta.inject.Named
 import jakarta.inject.Singleton
 
 import java.time.Clock
-import java.time.LocalDate
-import java.time.ZoneOffset
 
 import static com.trevorism.service.Validation.require
 import static com.trevorism.service.Validation.requireOneOf
@@ -39,7 +37,7 @@ class ObservationService {
     GoalObservation create(String ownerId, String metricId, GoalObservation observation) {
         GoalMetric metric = metricRepository.get(ownerId, metricId)
         observation.metricId = metric.id
-        observation.observedAt = observation.observedAt ?: ownersToday(ownerId)
+        observation.observedAt = observation.observedAt ?: profileService.localDayStart(ownerId, clock.instant())
         observation.metricSource = observation.metricSource ?: MetricSourceType.MANUAL
         requireOneOf(observation.metricSource, MetricSourceType.ALL, "metricSource")
         observation.missed = observation.missed ?: false
@@ -131,9 +129,5 @@ class ObservationService {
         require(index >= 0, "the observation requires one of the metric's choices: ${choices*.value}")
         observation.label = choices[index].label
         return index
-    }
-
-    private Date ownersToday(String ownerId) {
-        Date.from(LocalDate.now(clock.withZone(profileService.zoneFor(ownerId))).atStartOfDay(ZoneOffset.UTC).toInstant())
     }
 }

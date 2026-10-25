@@ -277,7 +277,7 @@ class ProgressCalculator {
 
     List<MetricSegment> segments(GoalMetric metric, Goal goal, List<GoalObservation> allObservations, List<GoalAdjustment> adjustments) {
         List<GoalAdjustment> boundaries = adjustments
-                .findAll { it.effectiveDate != null && it.effectiveDate.after(goal.startDate) && !toLocalDate(it.effectiveDate).isAfter(today) }
+                .findAll { it.effectiveDate != null && it.effectiveDate.after(goal.startDate) && isByToday(it.effectiveDate) }
                 .sort { it.effectiveDate }
         if (!boundaries || !(metric.type in [MetricType.NUMERIC, MetricType.SCALE, MetricType.BOOLEAN])) {
             return []
@@ -332,7 +332,7 @@ class ProgressCalculator {
     }
 
     private List<GoalObservation> recordedByToday(List<GoalObservation> observations) {
-        observations.findAll { it.observedAt != null && !toLocalDate(it.observedAt).isAfter(today) }
+        observations.findAll { it.observedAt != null && isByToday(it.observedAt) }
                 .sort { a, b -> a.observedAt <=> b.observedAt ?: a.createdDate <=> b.createdDate }
     }
 
@@ -368,6 +368,14 @@ class ProgressCalculator {
             periods << period
         }
         return periods
+    }
+
+    private boolean isByToday(Date date) {
+        isCalendarDay(date) ? !toLocalDate(date).isAfter(today) : !date.after(now)
+    }
+
+    private static boolean isCalendarDay(Date date) {
+        date.time % (DAY_MILLIS as long) == 0
     }
 
     private boolean hasStarted(Goal goal) {
