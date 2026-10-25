@@ -1,7 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { buildMetricPayload, metricFormFrom, validateMetric } from '../forms.js'
-import { FrequencyType, MetricDirectionType, MetricMeasuresType, MetricType, metricTypeLabels } from '../types.js'
+import { FrequencyType, MetricDirectionType, MetricMeasuresType, MetricType, isEachValueTarget, metricDirectionLabels, metricTypeLabels } from '../types.js'
 
 const props = defineProps({
   metric: { type: Object, default: null },
@@ -21,6 +21,8 @@ const measuresOptions = [
 ]
 
 const hasDirection = computed(() => form.type === MetricType.NUMERIC || form.type === MetricType.SCALE)
+const directionOptions = MetricDirectionType.ALL.map((value) => ({ value, text: metricDirectionLabels[value] }))
+const countsTimesPerWeek = computed(() => form.type === MetricType.BOOLEAN && form.frequency === 'daily' && Number(form.timesPerWeek) > 0)
 
 function addChoice() {
   form.choices.push('')
@@ -60,9 +62,9 @@ function submit() {
     <span v-if="editing && !form.enabled" class="paused-hint text-xs text-slate-500">Paused: hidden from Today and left out of progress until you turn it back on.</span>
 
     <div v-if="hasDirection" class="flex flex-wrap gap-3">
-      <va-select v-model="form.direction" label="Direction" :options="MetricDirectionType.ALL" />
+      <va-select v-model="form.direction" class="metric-direction" label="Direction" :options="directionOptions" value-by="value" text-by="text" />
       <va-input v-if="form.type === 'numeric'" v-model="form.unit" label="Unit" placeholder="e.g. bpm" />
-      <va-input v-model="form.baseline" label="Baseline" type="number" />
+      <va-input v-if="!isEachValueTarget(form)" v-model="form.baseline" label="Baseline" type="number" />
       <va-input v-model="form.target" label="Target" type="number" />
       <va-input v-if="form.direction === 'maintain'" v-model="form.tolerance" label="Tolerance (±)" type="number" />
     </div>
@@ -73,7 +75,15 @@ function submit() {
     </div>
 
     <va-input
-      v-if="form.type === 'boolean'"
+      v-if="form.type === 'boolean' && form.frequency === 'daily'"
+      v-model="form.timesPerWeek"
+      class="times-per-week"
+      label="Times per week (optional)"
+      type="number"
+      placeholder="e.g. 3"
+    />
+    <va-input
+      v-if="form.type === 'boolean' && !countsTimesPerWeek"
       v-model="form.targetPercent"
       class="target-percent"
       label="Target: % of answers that are Yes"

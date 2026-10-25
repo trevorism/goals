@@ -27,6 +27,7 @@ class MetricProgress {
     Double adherence
     Integer answeredPeriods
     Integer windowPeriods
+    Integer currentPeriodCount
     Integer currentStreak
     Integer bestStreak
 }

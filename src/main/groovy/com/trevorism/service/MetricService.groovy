@@ -17,6 +17,8 @@ import static com.trevorism.service.Validation.requireOneOf
 @Singleton
 class MetricService {
 
+    private static final int DAYS_PER_WEEK = 7
+
     private final OwnedRepository<Goal> goalRepository
     private final OwnedRepository<GoalMetric> metricRepository
     private final OwnedRepository<GoalObservation> observationRepository
@@ -66,6 +68,7 @@ class MetricService {
         existing.direction = changes.direction ?: existing.direction
         existing.baseline = changes.baseline != null ? changes.baseline : existing.baseline
         existing.target = changes.target != null ? changes.target : existing.target
+        existing.timesPerWeek = changes.timesPerWeek != null ? changes.timesPerWeek : existing.timesPerWeek
         existing.tolerance = changes.tolerance != null ? changes.tolerance : existing.tolerance
         existing.scaleMin = changes.scaleMin != null ? changes.scaleMin : existing.scaleMin
         existing.scaleMax = changes.scaleMax != null ? changes.scaleMax : existing.scaleMax
@@ -113,6 +116,14 @@ class MetricService {
         if (metric.type == MetricType.SCALE) {
             require(metric.scaleMin != null && metric.scaleMax != null && metric.scaleMin < metric.scaleMax,
                     "a scale metric requires scaleMin < scaleMax")
+        }
+        if (metric.direction in [MetricDirectionType.AT_LEAST, MetricDirectionType.AT_MOST]) {
+            require(metric.type in [MetricType.NUMERIC, MetricType.SCALE], "at least and at most apply to numeric and scale metrics")
+            require(metric.target != null, "an at least or at most metric requires a target")
+        }
+        if (metric.timesPerWeek) {
+            require(metric.type == MetricType.BOOLEAN && metric.frequency == FrequencyType.DAILY, "times per week applies to daily yes/no metrics")
+            require(metric.timesPerWeek % 1 == 0 && metric.timesPerWeek >= 1 && metric.timesPerWeek <= DAYS_PER_WEEK, "times per week must be a whole number from 1 to 7")
         }
         if (metric.type == MetricType.BOOLEAN && metric.target != null) {
             require(metric.target > 0 && metric.target <= 1, "a boolean metric's target is the share of yes answers, in (0, 1]")

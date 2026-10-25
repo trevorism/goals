@@ -16,6 +16,7 @@ class GoalMetric implements Owned {
 
     Double baseline
     Double target
+    Double timesPerWeek
     Double tolerance
     Double scaleMin
     Double scaleMax

@@ -64,6 +64,28 @@ describe('goals', () => {
 })
 
 describe('metrics', () => {
+  it('sends times per week for daily yes/no metrics and 0 to turn it off', () => {
+    const running = { ...metricFormFrom(null), name: 'Running', type: 'boolean', timesPerWeek: '3' }
+
+    expect(buildMetricPayload(running)).toMatchObject({ timesPerWeek: 3 })
+    expect(buildMetricPayload({ ...running, timesPerWeek: '' })).toMatchObject({ timesPerWeek: 0 })
+    expect(buildMetricPayload({ ...running, frequency: 'weekly' })).toMatchObject({ timesPerWeek: 0 })
+    expect(metricFormFrom({ name: 'Running', type: 'boolean', timesPerWeek: 3 }).timesPerWeek).toBe(3)
+    expect(metricFormFrom({ name: 'Running', type: 'boolean', timesPerWeek: 0 }).timesPerWeek).toBe('')
+    expect(validateMetric({ ...running, timesPerWeek: '8' })).toBe('Times per week must be a whole number from 1 to 7')
+    expect(validateMetric({ ...running, timesPerWeek: '2.5' })).toBe('Times per week must be a whole number from 1 to 7')
+    expect(validateMetric(running)).toBe('')
+    expect(validateMetric({ ...running, timesPerWeek: '0' })).toBe('')
+    expect(buildMetricPayload({ ...running, timesPerWeek: '0' })).toMatchObject({ timesPerWeek: 0 })
+  })
+
+  it('requires a target for at least and at most metrics', () => {
+    const meals = { ...metricFormFrom(null), name: 'Meals', direction: 'at_least' }
+
+    expect(validateMetric(meals)).toBe('An at least or at most metric needs a target')
+    expect(validateMetric({ ...meals, target: '4' })).toBe('')
+  })
+
   it('sends numeric fields only for numeric metrics', () => {
     const form = { ...metricFormFrom(null), name: 'Resting heart rate', unit: 'bpm', direction: 'decrease', baseline: '62', target: '55' }
 
@@ -132,6 +154,10 @@ describe('metrics', () => {
   it('describes targets for display', () => {
     expect(describeTarget({ type: 'numeric', baseline: 62, target: 55, unit: 'bpm' })).toBe('62 bpm → 55 bpm')
     expect(describeTarget({ type: 'boolean', target: 0.85 })).toBe('Yes 85% of the time')
+    expect(describeTarget({ type: 'boolean', frequency: 'daily', target: 0.43, timesPerWeek: 3 })).toBe('3× per week')
+    expect(describeTarget({ type: 'boolean', frequency: 'daily', target: 0.43, timesPerWeek: 0 })).toBe('Yes 43% of the time')
+    expect(describeTarget({ type: 'numeric', direction: 'at_least', target: 4, unit: 'meals' })).toBe('at least 4 meals')
+    expect(describeTarget({ type: 'numeric', direction: 'at_most', target: 2 })).toBe('at most 2')
     expect(describeTarget({ type: 'numeric' })).toBe('')
   })
 

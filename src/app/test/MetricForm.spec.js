@@ -63,6 +63,23 @@ describe('MetricForm', () => {
     expect(wrapper.find('.form-error').text()).toBe('Enter a name')
   })
 
+  it('asks for times per week instead of a yes percentage once it is set', async () => {
+    const wrapper = mountForm({ metric: { id: 'm', name: 'Running', type: 'boolean', frequency: 'daily', target: 0.43, timesPerWeek: 3 } })
+
+    expect(wrapper.find('.times-per-week').element.value).toBe('3')
+    expect(wrapper.find('.target-percent').exists()).toBe(false)
+
+    await wrapper.find('.times-per-week').setValue('')
+    expect(wrapper.find('.target-percent').exists()).toBe(true)
+  })
+
+  it('offers at least and at most directions and hides the baseline for them', async () => {
+    const wrapper = mountForm({ metric: { id: 'm', name: 'Family meals', type: 'numeric', direction: 'at_least', target: 4 } })
+
+    expect(selectNamed(wrapper, 'Direction').props('options').map((option) => option.value)).toEqual(['increase', 'decrease', 'maintain', 'at_least', 'at_most'])
+    expect(wrapper.findAll('.va-input').some((input) => input.attributes('data-label') === 'Baseline')).toBe(false)
+  })
+
   it('pauses and resumes a metric only when editing', async () => {
     expect(mountForm().find('.metric-enabled').exists()).toBe(false)
 

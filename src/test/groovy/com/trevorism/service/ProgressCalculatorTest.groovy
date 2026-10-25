@@ -15,8 +15,10 @@ import com.trevorism.model.types.MetricType
 import com.trevorism.model.types.ProgressStatusType
 import org.junit.jupiter.api.Test
 
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 
 class ProgressCalculatorTest {
 
@@ -400,6 +402,82 @@ class ProgressCalculatorTest {
 
         assert result.windowPeriods == 28
         assert near(result.adherence, 27 / 28d)
+    }
+
+    @Test
+    void testAnAtLeastMetricScoresTheShareOfRecentValuesReachingTheTarget() {
+        GoalMetric meals = metric(type: MetricType.NUMERIC, frequency: FrequencyType.WEEKLY, direction: MetricDirectionType.AT_LEAST, target: 4d)
+
+        MetricProgress result = progressOf(meals, values([22: 5d, 29: 3d, 36: 4d, 43: 6d]))
+
+        assert near(result.score, 0.75)
+        assert near(result.expected, 1)
+        assert near(result.current, 6)
+        assert result.requiredRate == null
+        assert result.stalled == null
+    }
+
+    @Test
+    void testAnAtMostMetricScoresTheShareOfRecentValuesWithinTheTarget() {
+        GoalMetric screenTime = metric(type: MetricType.NUMERIC, direction: MetricDirectionType.AT_MOST, target: 2d)
+
+        MetricProgress result = progressOf(screenTime, values([47: 1.5d, 48: 3d, 49: 2d, 50: 2.5d]))
+
+        assert near(result.score, 0.5)
+    }
+
+    private static int mondayOfWeek(int offset) {
+        ChronoUnit.DAYS.between(START, START.plusDays(offset).with(DayOfWeek.MONDAY)) as int
+    }
+
+    @Test
+    void testTimesPerWeekScoresDecidedWeeksAndLeavesUndecidedOnesOut() {
+        GoalMetric running = metric(type: MetricType.BOOLEAN, timesPerWeek: 3d)
+        int thisWeek = mondayOfWeek(50)
+        int lastWeek = thisWeek - 7
+        int twoWeeksAgo = thisWeek - 14
+        int threeWeeksAgo = thisWeek - 21
+        Map<Integer, Boolean> byDay = [(threeWeeksAgo): true, (threeWeeksAgo + 2): true] +
+                [(twoWeeksAgo): true] + (1..5).collectEntries { [twoWeeksAgo + it, false] } +
+                [(lastWeek): true, (lastWeek + 2): true, (lastWeek + 4): true] +
+                [(thisWeek): true, (thisWeek + 1): true]
+
+        MetricProgress result = progressOf(running, answers(byDay))
+
+        assert result.windowPeriods == 3
+        assert result.answeredPeriods == 2
+        assert near(result.adherence, 0.5)
+        assert near(result.score, 0.5)
+        assert result.currentPeriodCount == 2
+        assert result.currentStreak == 1
+        assert result.bestStreak == 1
+    }
+
+    @Test
+    void testAWeekIsMetAsSoonAsItReachesItsTimesAndMissedOnceItCannot() {
+        GoalMetric running = metric(type: MetricType.BOOLEAN, timesPerWeek: 3d)
+        int thisWeek = mondayOfWeek(50)
+
+        MetricProgress met = progressOf(running, answers([(thisWeek): true, (thisWeek + 1): true, (thisWeek + 3): true]))
+        MetricProgress missed = progressOf(running, answers((0..4).collectEntries { [thisWeek + it, false] }))
+
+        assert met.windowPeriods == 1
+        assert near(met.adherence, 1)
+        assert met.currentStreak == 1
+        assert missed.windowPeriods == 1
+        assert near(missed.adherence, 0)
+    }
+
+    @Test
+    void testTimesPerWeekLeavesOutYesDaysBeforeAMidweekGoalStart() {
+        GoalMetric running = metric(type: MetricType.BOOLEAN, timesPerWeek: 3d)
+        ProgressCalculator firstWeek = new ProgressCalculator(day(2))
+
+        MetricProgress result = firstWeek.metricProgress(running, goal("g"), answers([(-3): true, (-2): true, 0: true]))
+
+        assert result.currentPeriodCount == 1
+        assert result.answeredPeriods == 0
+        assert result.currentStreak == 0
     }
 
     @Test

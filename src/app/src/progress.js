@@ -1,4 +1,4 @@
-import { MetricDirectionType, MetricType } from './types.js'
+import { MetricDirectionType, MetricType, isEachValueTarget, timesPerWeekOf } from './types.js'
 import { formatDay } from './forms.js'
 
 export const ProgressStatusType = {
@@ -263,6 +263,11 @@ const withRate = (metric, perWeek) => `${signed(perWeek)}${metric.unit ? ` ${met
 
 const PARTIAL_COVERAGE = 0.5
 
+function describeWeeksMet(metricProgress) {
+  const met = Math.round(metricProgress.adherence * metricProgress.answeredPeriods)
+  return `${met} of ${metricProgress.answeredPeriods} weeks met`
+}
+
 function describeAdherence(metric, metricProgress) {
   const { answeredPeriods, windowPeriods } = metricProgress
   const share = `${formatPercent(metricProgress.adherence)} yes`
@@ -283,7 +288,9 @@ export function buildTrendChart(metric, goal, observations, metricProgress, now,
   const annotations = adjustmentMarkers(segments)
   const target = planTarget(metric)
 
-  if (metric.direction === MetricDirectionType.MAINTAIN) {
+  if (isEachValueTarget(metric)) {
+    if (target !== null) annotations.target = targetLine(metric, target, metric.direction === MetricDirectionType.AT_MOST ? 10 : -10)
+  } else if (metric.direction === MetricDirectionType.MAINTAIN) {
     if (target !== null && metric.tolerance !== null && metric.tolerance !== undefined) {
       annotations.tolerance = {
         type: 'box',
@@ -298,22 +305,7 @@ export function buildTrendChart(metric, goal, observations, metricProgress, now,
     const baseline = planBaseline(metric, points)
     if (baseline !== null && target !== null) {
       datasets.push({ label: 'Plan', data: [{ x: start, y: baseline }, { x: end, y: target }], ...lineStyle(chartColors.plan), borderDash: DASH, order: 2 })
-      annotations.target = {
-        type: 'line',
-        yMin: target,
-        yMax: target,
-        borderColor: chartColors.axis,
-        borderWidth: 1,
-        label: {
-          display: true,
-          content: `Target ${withUnit(metric, target)}`,
-          position: 'end',
-          yAdjust: metric.direction === MetricDirectionType.DECREASE ? 10 : -10,
-          color: chartColors.secondaryInk,
-          backgroundColor: 'transparent',
-          font: { size: 11 }
-        }
-      }
+      annotations.target = targetLine(metric, target, metric.direction === MetricDirectionType.DECREASE ? 10 : -10)
     }
   }
 
@@ -337,6 +329,52 @@ export function buildTrendChart(metric, goal, observations, metricProgress, now,
     : { grace: '10%', title: { display: !!metric.unit, text: metric.unit, color: chartColors.muted } }
   const options = baseOptions(goal, now, yScale, annotations, datasets.length > 1)
   options.plugins.tooltip.callbacks.label = (item) => `${item.dataset.label}: ${withUnit(metric, item.parsed.y)}`
+  return { data: { datasets }, options }
+}
+
+function targetLine(metric, target, yAdjust, content = `Target ${withUnit(metric, target)}`) {
+  return {
+    type: 'line',
+    yMin: target,
+    yMax: target,
+    borderColor: chartColors.axis,
+    borderWidth: 1,
+    label: {
+      display: true,
+      content,
+      position: 'end',
+      yAdjust,
+      color: chartColors.secondaryInk,
+      backgroundColor: 'transparent',
+      font: { size: 11 }
+    }
+  }
+}
+
+export function weeklyYesCounts(observations, now, startDate) {
+  const firstDay = periodOf(startDate, 'daily')
+  const answers = new Map()
+  ;[...observations]
+    .filter((observation) => !observation.missed && observation.observedAt && time(observation.observedAt) <= time(now) && periodOf(observation.observedAt, 'daily') >= firstDay)
+    .sort((a, b) => time(a.observedAt) - time(b.observedAt) || time(a.createdDate ?? 0) - time(b.createdDate ?? 0))
+    .forEach((observation) => answers.set(periodOf(observation.observedAt, 'daily'), observation.value === 1))
+  const counts = new Map()
+  answers.forEach((yes, day) => {
+    const week = periodOf(day, 'weekly')
+    counts.set(week, (counts.get(week) ?? 0) + (yes ? 1 : 0))
+  })
+  return [...counts.entries()].sort((a, b) => a[0] - b[0]).map(([x, y]) => ({ x, y }))
+}
+
+export function buildWeeklyCountChart(metric, goal, observations, now, segments = []) {
+  const times = timesPerWeekOf(metric)
+  const annotations = adjustmentMarkers(segments)
+  annotations.target = targetLine(metric, times, -10, `${times}× per week`)
+  const start = time(goal.startDate)
+  const points = weeklyYesCounts(observations, now, goal.startDate).map((point) => ({ x: Math.max(point.x, start), y: point.y }))
+  const datasets = [{ label: 'Yes days', data: points, ...pointStyle(chartColors.values) }]
+  const options = baseOptions(goal, now, { min: 0, max: 7, ticks: { stepSize: 1 } }, annotations, false)
+  options.plugins.tooltip.callbacks.label = (item) => `${item.parsed.y} yes that week`
   return { data: { datasets }, options }
 }
 
@@ -373,7 +411,9 @@ export function buildMetricChart(metric, goal, observations, metricProgress, now
     case MetricType.SCALE:
       return buildTrendChart(metric, goal, observations, metricProgress, now, segments)
     case MetricType.BOOLEAN:
-      return buildAdherenceChart(metric, goal, observations, now, segments)
+      return timesPerWeekOf(metric)
+        ? buildWeeklyCountChart(metric, goal, observations, now, segments)
+        : buildAdherenceChart(metric, goal, observations, now, segments)
     case MetricType.CHOICE:
       return buildChoiceChart(metric, goal, observations, now)
     default:
@@ -383,7 +423,9 @@ export function buildMetricChart(metric, goal, observations, metricProgress, now
 
 export function describeScore(metric, score) {
   if (score === null || score === undefined) return ''
+  if (timesPerWeekOf(metric)) return `${formatPercent(score)} of weeks met`
   if (metric.type === MetricType.BOOLEAN) return `${formatPercent(score)} of target`
+  if (isEachValueTarget(metric)) return `${formatPercent(score)} of recent values at target`
   if (metric.type === MetricType.CHOICE) return `${formatPercent(score)} of best`
   if (metric.direction === MetricDirectionType.MAINTAIN) return `${formatPercent(score)} within tolerance`
   return `${formatPercent(score)} of the way to target`
@@ -395,6 +437,10 @@ export function describeHeadline(row) {
   if (!metric || !metricProgress) {
     const effort = row.progress?.effortProgress
     return effort !== null && effort !== undefined ? `Effort ${formatPercent(effort)} across sub-goals and habits` : 'Add a metric with a target to track this goal'
+  }
+  const times = timesPerWeekOf(metric)
+  if (times && metricProgress.adherence !== null && metricProgress.adherence !== undefined) {
+    return `${metric.name}: ${describeWeeksMet(metricProgress)} (${times}× per week)`
   }
   if (metric.type === MetricType.BOOLEAN && metricProgress.adherence !== null && metricProgress.adherence !== undefined) {
     const target = metric.target !== null && metric.target !== undefined ? ` (target ${formatPercent(metric.target)})` : ''
@@ -424,6 +470,13 @@ export function describeMetricProgress(metric, metricProgress) {
     return []
   }
   const facts = []
+  const times = timesPerWeekOf(metric)
+  if (times) {
+    if (metricProgress.adherence !== null && metricProgress.adherence !== undefined) facts.push(describeWeeksMet(metricProgress))
+    if (metricProgress.currentPeriodCount !== null && metricProgress.currentPeriodCount !== undefined) facts.push(`this week ${metricProgress.currentPeriodCount} of ${times}`)
+    if (metricProgress.currentStreak) facts.push(`streak ${metricProgress.currentStreak} weeks (best ${metricProgress.bestStreak})`)
+    return facts
+  }
   if (metric.type === MetricType.BOOLEAN) {
     if (metricProgress.adherence !== null && metricProgress.adherence !== undefined) facts.push(describeAdherence(metric, metricProgress))
     if (metricProgress.currentStreak) facts.push(`streak ${metricProgress.currentStreak} (best ${metricProgress.bestStreak})`)

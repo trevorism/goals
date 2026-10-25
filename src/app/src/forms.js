@@ -1,4 +1,4 @@
-import { MetricDirectionType, MetricType } from './types.js'
+import { MetricDirectionType, MetricType, isEachValueTarget, timesPerWeekOf } from './types.js'
 
 const pad = (number) => String(number).padStart(2, '0')
 
@@ -90,6 +90,7 @@ export function buildMetricPayload(form) {
   if (form.type === MetricType.BOOLEAN) {
     const percent = toNumber(form.targetPercent)
     payload.target = percent === null ? null : percent / 100
+    payload.timesPerWeek = form.frequency === 'daily' ? toNumber(form.timesPerWeek) ?? 0 : 0
   }
   if (form.type === MetricType.CHOICE) {
     payload.choices = enteredChoices(form.choices).map((label) => ({ label }))
@@ -120,6 +121,13 @@ export function validateMetric(form) {
     if (percent !== null && (percent <= 0 || percent > 100)) {
       return 'The target must be between 1% and 100%'
     }
+    const times = toNumber(form.timesPerWeek)
+    if (form.frequency === 'daily' && times !== null && times !== 0 && !(Number.isInteger(times) && times >= 1 && times <= 7)) {
+      return 'Times per week must be a whole number from 1 to 7'
+    }
+  }
+  if ((form.type === MetricType.NUMERIC || form.type === MetricType.SCALE) && isEachValueTarget(form) && toNumber(form.target) === null) {
+    return 'An at least or at most metric needs a target'
   }
   if ((form.type === MetricType.NUMERIC || form.type === MetricType.SCALE) && form.direction === MetricDirectionType.MAINTAIN && toNumber(form.tolerance) === null) {
     return 'A metric to maintain needs a tolerance'
@@ -140,6 +148,7 @@ export function metricFormFrom(metric) {
     baseline: metric?.baseline ?? '',
     target: metric?.type === MetricType.BOOLEAN ? '' : metric?.target ?? '',
     targetPercent: metric?.type === MetricType.BOOLEAN && metric?.target != null ? Math.round(metric.target * 100) : '',
+    timesPerWeek: metric?.timesPerWeek > 0 ? metric.timesPerWeek : '',
     tolerance: metric?.tolerance ?? '',
     scaleMin: metric?.scaleMin ?? 1,
     scaleMax: metric?.scaleMax ?? 5,
@@ -201,12 +210,16 @@ export function describeObservation(metric, observation) {
 
 export function describeTarget(metric) {
   if (metric.type === MetricType.BOOLEAN) {
+    const times = timesPerWeekOf(metric)
+    if (times) return `${times}× per week`
     return metric.target != null ? `Yes ${Math.round(metric.target * 100)}% of the time` : ''
   }
   if (metric.target == null) {
     return ''
   }
   const unit = metric.unit ? ` ${metric.unit}` : ''
+  if (metric.direction === MetricDirectionType.AT_LEAST) return `at least ${metric.target}${unit}`
+  if (metric.direction === MetricDirectionType.AT_MOST) return `at most ${metric.target}${unit}`
   const from = metric.baseline != null ? `${metric.baseline}${unit} → ` : ''
   return `${from}${metric.target}${unit}`
 }

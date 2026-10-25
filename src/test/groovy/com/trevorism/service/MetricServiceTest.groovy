@@ -125,6 +125,32 @@ class MetricServiceTest {
     }
 
     @Test
+    void testTimesPerWeekIsForDailyYesNoMetricsAndZeroTurnsItOff() {
+        assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", type: MetricType.NUMERIC, timesPerWeek: 3d)) }
+        assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", type: MetricType.BOOLEAN, frequency: FrequencyType.WEEKLY, timesPerWeek: 3d)) }
+        assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", type: MetricType.BOOLEAN, timesPerWeek: 8d)) }
+        assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "x", type: MetricType.BOOLEAN, timesPerWeek: 2.5d)) }
+
+        GoalMetric running = service.create(OWNER, root.id, new GoalMetric(name: "Running", type: MetricType.BOOLEAN, target: 0.43d))
+        assert service.update(OWNER, running.id, new GoalMetric(timesPerWeek: 3d)).timesPerWeek == 3d
+        assert service.update(OWNER, running.id, new GoalMetric(name: "Run")).timesPerWeek == 3d
+        assert service.update(OWNER, running.id, new GoalMetric(timesPerWeek: 0d)).timesPerWeek == 0d
+    }
+
+    @Test
+    void testAtLeastAndAtMostNeedATarget() {
+        assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "Meals", direction: MetricDirectionType.AT_LEAST)) }
+        assert service.create(OWNER, root.id, new GoalMetric(name: "Meals", direction: MetricDirectionType.AT_LEAST, target: 4d)).direction == MetricDirectionType.AT_LEAST
+        assert service.create(OWNER, root.id, new GoalMetric(name: "Screens", direction: MetricDirectionType.AT_MOST, target: 2d)).direction == MetricDirectionType.AT_MOST
+    }
+
+    @Test
+    void testAtLeastAndAtMostApplyOnlyToNumbersAndScales() {
+        assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "Ran", type: MetricType.BOOLEAN, direction: MetricDirectionType.AT_LEAST, target: 0.5d)) }
+        assertBadRequest { service.create(OWNER, root.id, new GoalMetric(name: "Mood", type: MetricType.CHOICE, direction: MetricDirectionType.AT_MOST, target: 1d, choices: [new Choice(label: "Bad"), new Choice(label: "Good")])) }
+    }
+
+    @Test
     void testListForGoalReturnsThatGoalsMetrics() {
         Goal child = store.goalService().createChild(OWNER, root.id, new Goal(title: "Sleep"))
         service.create(OWNER, root.id, new GoalMetric(name: "Weight"))

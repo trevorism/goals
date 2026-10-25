@@ -145,7 +145,7 @@ from stored entities:
 | `GoalStatusType` | `Goal.status` | `active` \| `completed` \| `missed` \| `abandoned` |
 | `MetricType` | `GoalMetric.type` | `numeric` \| `boolean` \| `scale` \| `choice` \| `text` |
 | `MetricMeasuresType` | `GoalMetric.measures` | `outcome` (lag) \| `effort` (lead) |
-| `MetricDirectionType` | `GoalMetric.direction` | `increase` \| `decrease` \| `maintain` |
+| `MetricDirectionType` | `GoalMetric.direction` | `increase` \| `decrease` \| `maintain` \| `at_least` \| `at_most` |
 | `FrequencyType` | `GoalMetric.frequency` | `daily` \| `weekly` \| `monthly` |
 | `MetricSourceType` | `GoalMetric.source`, `GoalObservation.source` | `manual` (older observations may say `prompt` or `http`) |
 | `AdjustmentCategoryType` | `GoalAdjustment.category` | `habit` \| `tool` \| `environment` \| `plan` \| `other` |
@@ -175,7 +175,8 @@ from stored entities:
 | type | `MetricType`; `numeric` by default; can't change after creation |
 | measures | `MetricMeasuresType`: whether the metric tracks the result (`outcome`) or the work toward it (`effort`); `outcome` by default |
 | direction | `MetricDirectionType`; numeric and scale only; `increase` by default |
-| baseline, target, tolerance | For a boolean metric, `target` is the required share of yes answers, e.g. 0.857 (6/7), in (0, 1]. `tolerance` is required for `maintain`. |
+| baseline, target, tolerance | For a boolean metric, `target` is the required share of yes answers, e.g. 0.857 (6/7), in (0, 1]. `tolerance` is required for `maintain`; `at_least` and `at_most` require a target. |
+| timesperweek | Daily yes/no metrics only: a whole number from 1 to 7, e.g. 3 for "run 3× a week". When set, each week is met or missed and `target` is ignored. 0 turns it off, since datastore can't clear a field. |
 | scalemin, scalemax | scale only |
 | choices | `[{value, label}]`. A missing value is derived from the label (`"Just OK"` → `just-ok`) and made unique. Boolean metrics always get `yes`/`no`. |
 | frequency | `FrequencyType`; `daily` by default |
@@ -219,8 +220,9 @@ scored metric produces a **progress score p ∈ [0, 1]**. `ProgressCalculator` c
 
 | Type | Collected as | Score p | Chart |
 |---|---|---|---|
-| numeric | number | `clamp((current − baseline) / (target − baseline))`. `current` is the fitted value at the latest observation (the latest value when there are fewer than 3). A missing baseline uses the first value; no target means no score. For `maintain`, the share of the last 7 values within `tolerance` of the target. | Values, trend fit, plan line, target line or tolerance band |
+| numeric | number | `clamp((current − baseline) / (target − baseline))`. `current` is the fitted value at the latest observation (the latest value when there are fewer than 3). A missing baseline uses the first value; no target means no score. For `maintain`, the share of the last 7 values within `tolerance` of the target; for `at_least` and `at_most`, the share of the last 7 values at or above, or at or below, the target. | Values, trend fit, plan line, target line or tolerance band |
 | boolean | Yes/No → 1/0 | `min(adherence / target, 1)`, or adherence when there's no target. Adherence is the share of **recorded** periods answered Yes over the last 28 days (daily) or 4 periods (weekly, monthly), counted from the first answer. Unrecorded periods are left out; `answeredperiods` of `windowperiods` reports the coverage, and the UI marks coverage under half as partial data. The window ends today when today is recorded, otherwise yesterday, so it always spans a full 28 days or 4 periods. No recorded period in the window means no score. The latest answer in a period wins. | Rolling adherence over recorded periods with a target line; current and best streak, where unrecorded periods don't break a streak |
+| boolean, times per week | Yes/No days, judged per week | The share of **decided** weeks met over the last 4 weeks. A week is met once its Yes days reach `timesperweek`, missed once its Yes days plus its unrecorded days (including days still to come) can't, and undecided otherwise; undecided weeks are left out. `currentperiodcount` is this week's Yes days. | Yes days per week against a times-per-week line; weekly streak |
 | scale | scale points | Mean of the last 7 values, normalized between baseline and target (defaulting to the scale's ends) | Values, trend fit, plan line, target line |
 | choice | choices, ordered worst to best | Mean of position ÷ (choices − 1) over the last 7 answers | Answers on a worst→best axis |
 | text | free text | Not scored | None; the journal list under the card |
@@ -231,13 +233,13 @@ owner's local today are ignored. "Today" is the owner's local date, from the pro
 ### Expected progress
 - **Progress metrics** (numeric and scale that increase or decrease) follow a linear plan:
   `expected(t) = clamp((t − start) / (end − start))`, using the metric's goal dates.
-- **Steady metrics** (yes/no, choice, and `maintain`) should be at target the whole time, so
+- **Steady metrics** (yes/no, choice, `maintain`, `at_least` and `at_most`) should be at target the whole time, so
   `expected = 1`.
 - **Pace** = `p − expected`. **Ahead** when pace > 0.05, **on track** within ±0.05, **behind** below
   that. **No data** when there's no score.
 - **At risk:** a metric that is ahead or on track, but whose trend projects below 0.9 of the way to
   its target at the end date.
-- **Required and recent rate** (numeric and scale with an explicit target, not `maintain`): `requiredrate` is the change per
+- **Required and recent rate** (numeric and scale with an explicit target, `increase` or `decrease` only): `requiredrate` is the change per
   week needed from the latest value to reach the target by the end date. `recentrate` is the fitted
   change per week over the last 14 days, or over the last 5 values when 14 days hold fewer. A trend is
   **stalled** when its recent rate moves toward the target at less than a quarter of the required
@@ -529,10 +531,14 @@ ladder's lower rungs come first. The upper rungs wait for a step that needs them
 - 6b. Required and recent rates, with stalled trends named instead of projected.
 - 6c. Pausing a metric (`enabled`), and a setup review with the owner: pause metrics that can't mean
   anything yet, and fix targets and baselines that misstate progress.
-- Then a feature freeze for about three weeks, and a read-only checkpoint around 2026-11-29: which
-  metrics are still recorded, how catch-up happens, and whether the stalled-trend line changed
-  anything. The next slice (a week catch-up grid, per-period count targets, or an on-demand
-  reflection) is chosen from that evidence.
+- No feature freeze, by the owner's choice: slices keep shipping, each one small and separate.
+
+**Phase 7: per-period targets** (0.13.0)
+- 7a. `at_least` and `at_most`: each value is judged against the target, for counts like "4 family
+  meals a week".
+- 7b. `timesperweek` for daily yes/no habits like "run 3× a week", judged per week and honest about
+  unrecorded days.
+- Next candidates: a week catch-up grid on Today, and an on-demand weekly reflection.
 
 **Later:**
 - Public and shared goals, with accountability partners.

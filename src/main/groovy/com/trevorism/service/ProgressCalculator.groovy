@@ -122,13 +122,17 @@ class ProgressCalculator {
                 measureTrend(metric, goal, observations.findAll { !it.missed && it.value != null }, result)
                 break
             case MetricType.BOOLEAN:
-                measureAdherence(metric, goal, observations, result)
+                if (metric.timesPerWeek && (metric.frequency ?: FrequencyType.DAILY) == FrequencyType.DAILY) {
+                    measureWeeklyCount(metric, goal, observations, result)
+                } else {
+                    measureAdherence(metric, goal, observations, result)
+                }
                 break
             case MetricType.CHOICE:
                 measureChoices(metric, observations.findAll { !it.missed && it.value != null }, result)
                 break
         }
-        boolean steady = metric.type in [MetricType.BOOLEAN, MetricType.CHOICE] || metric.direction == MetricDirectionType.MAINTAIN
+        boolean steady = metric.type in [MetricType.BOOLEAN, MetricType.CHOICE] || metric.direction in MetricDirectionType.EACH_VALUE
         result.expected = steady ? 1d : elapsedFraction(goal)
         result.status = result.score == null ? ProgressStatusType.NO_DATA : statusOf(result.score - result.expected)
         if (result.status in [ProgressStatusType.AHEAD, ProgressStatusType.ON_TRACK] && result.projectedProgress != null && result.projectedProgress < AT_RISK_PROJECTION) {
@@ -150,11 +154,12 @@ class ProgressCalculator {
             result.fitCount = fit.count
         }
 
-        if (metric.direction == MetricDirectionType.MAINTAIN) {
+        if (metric.direction in MetricDirectionType.EACH_VALUE) {
             List<GoalObservation> recent = observations.takeRight(ROLLING_OBSERVATIONS)
             result.current = recent.last().value
-            if (metric.target != null && metric.tolerance != null) {
-                result.score = recent.count { Math.abs(it.value - metric.target) <= metric.tolerance } / (double) recent.size()
+            Closure<Boolean> meets = valueTest(metric)
+            if (meets) {
+                result.score = recent.count { meets(it.value) } / (double) recent.size()
             }
             return
         }
@@ -175,6 +180,17 @@ class ProgressCalculator {
             result.projectedEnd = scale ? Math.max(metric.scaleMin, Math.min(metric.scaleMax, fit.valueAt(endX))) : fit.valueAt(endX)
             result.projectedProgress = fractionToward(result.projectedEnd, baseline, target, metric.direction)
             result.projectedTargetDate = projectedTargetDate(goal, fit, result.current, target, metric.direction, endX)
+        }
+    }
+
+    private static Closure<Boolean> valueTest(GoalMetric metric) {
+        if (metric.target == null) {
+            return null
+        }
+        switch (metric.direction) {
+            case MetricDirectionType.AT_LEAST: return { double value -> value >= metric.target }
+            case MetricDirectionType.AT_MOST: return { double value -> value <= metric.target }
+            default: return metric.tolerance != null ? { double value -> Math.abs(value - metric.target) <= metric.tolerance } : null
         }
     }
 
@@ -273,6 +289,55 @@ class ProgressCalculator {
         }
         result.currentStreak = answersInOrder.reverse().takeWhile { it }.size()
         result.bestStreak = best
+    }
+
+    private void measureWeeklyCount(GoalMetric metric, Goal goal, List<GoalObservation> observations, MetricProgress result) {
+        LocalDate goalStart = toLocalDate(goal.startDate)
+        Map<LocalDate, Boolean> answers = answersByPeriod(observations, FrequencyType.DAILY).findAll { !it.key.isBefore(goalStart) }
+        if (!answers) {
+            return
+        }
+        LocalDate currentWeek = periodOf(today, FrequencyType.WEEKLY)
+        Map<LocalDate, Boolean> weeksMet = weeksMet(metric.timesPerWeek as int, answers)
+        LocalDate windowEnd = weeksMet.containsKey(currentWeek) ? currentWeek : currentWeek.minusWeeks(1)
+        LocalDate windowStart = windowEnd.minusWeeks(ADHERENCE_PERIODS - 1)
+        LocalDate trackingStart = [windowStart, periodOf(answers.keySet().min(), FrequencyType.WEEKLY)].max()
+
+        List<LocalDate> window = periodsBetween(trackingStart, windowEnd, FrequencyType.WEEKLY)
+        List<LocalDate> decided = window.findAll { weeksMet.containsKey(it) }
+        result.windowPeriods = window.size()
+        result.answeredPeriods = decided.size()
+        if (decided) {
+            result.adherence = decided.count { weeksMet[it] } / (double) decided.size()
+            result.score = result.adherence
+        }
+        result.current = result.adherence
+        result.currentPeriodCount = answers.count { it.value && periodOf(it.key, FrequencyType.WEEKLY) == currentWeek } as Integer
+
+        List<Boolean> weeksInOrder = weeksMet.findAll { !it.key.isAfter(currentWeek) }.sort { it.key }.values().toList()
+        int best = 0
+        int run = 0
+        weeksInOrder.each { boolean met ->
+            run = met ? run + 1 : 0
+            best = Math.max(best, run)
+        }
+        result.currentStreak = weeksInOrder.reverse().takeWhile { it }.size()
+        result.bestStreak = best
+    }
+
+    private Map<LocalDate, Boolean> weeksMet(int timesPerWeek, Map<LocalDate, Boolean> answers) {
+        Map<LocalDate, Boolean> decided = [:]
+        answers.keySet().collect { periodOf(it, FrequencyType.WEEKLY) }.unique().each { LocalDate week ->
+            List<LocalDate> days = periodsBetween(week, week.plusDays(6), FrequencyType.DAILY)
+            int yes = days.count { answers[it] == true }
+            int stillOpen = days.count { !answers.containsKey(it) }
+            if (yes >= timesPerWeek) {
+                decided[week] = true
+            } else if (yes + stillOpen < timesPerWeek) {
+                decided[week] = false
+            }
+        }
+        return decided
     }
 
     List<MetricSegment> segments(GoalMetric metric, Goal goal, List<GoalObservation> allObservations, List<GoalAdjustment> adjustments) {
