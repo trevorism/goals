@@ -150,7 +150,14 @@ describe('per-period targets', () => {
   it('counts yes days per week for the weekly chart', () => {
     const observations = [on(-7, true), on(-5, true), on(-4, false), on(0, true), on(10, true)]
 
-    expect(weeklyYesCounts(observations, new Date(monday + 3 * DAY))).toEqual([{ x: monday - 7 * DAY, y: 2 }, { x: monday, y: 1 }])
+    expect(weeklyYesCounts(observations, new Date(monday + 3 * DAY), new Date(monday - 7 * DAY))).toEqual([{ x: monday - 7 * DAY, y: 2 }, { x: monday, y: 1 }])
+  })
+
+  it('leaves out yes days before the goal starts', () => {
+    const midweekGoal = { startDate: new Date(monday + 2 * DAY).toISOString(), endDate: day(100) }
+    const chart = buildMetricChart(running, midweekGoal, [on(0, true), on(1, true), on(2, true)], null, new Date(monday + 4 * DAY))
+
+    expect(chart.data.datasets[0].data).toEqual([{ x: monday + 2 * DAY, y: 1 }])
   })
 
   it('charts weekly yes counts against the times per week', () => {

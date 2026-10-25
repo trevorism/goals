@@ -292,7 +292,8 @@ class ProgressCalculator {
     }
 
     private void measureWeeklyCount(GoalMetric metric, Goal goal, List<GoalObservation> observations, MetricProgress result) {
-        Map<LocalDate, Boolean> answers = answersByPeriod(observations, FrequencyType.DAILY)
+        LocalDate goalStart = toLocalDate(goal.startDate)
+        Map<LocalDate, Boolean> answers = answersByPeriod(observations, FrequencyType.DAILY).findAll { !it.key.isBefore(goalStart) }
         if (!answers) {
             return
         }
@@ -300,8 +301,7 @@ class ProgressCalculator {
         Map<LocalDate, Boolean> weeksMet = weeksMet(metric.timesPerWeek as int, answers)
         LocalDate windowEnd = weeksMet.containsKey(currentWeek) ? currentWeek : currentWeek.minusWeeks(1)
         LocalDate windowStart = windowEnd.minusWeeks(ADHERENCE_PERIODS - 1)
-        LocalDate trackingStart = [windowStart, periodOf(answers.keySet().min(), FrequencyType.WEEKLY),
-                                   periodOf(toLocalDate(goal.startDate), FrequencyType.WEEKLY)].max()
+        LocalDate trackingStart = [windowStart, periodOf(answers.keySet().min(), FrequencyType.WEEKLY)].max()
 
         List<LocalDate> window = periodsBetween(trackingStart, windowEnd, FrequencyType.WEEKLY)
         List<LocalDate> decided = window.findAll { weeksMet.containsKey(it) }

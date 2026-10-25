@@ -1,7 +1,7 @@
 ## 0.13.0
 
 - Daily yes/no habits can have a times-per-week goal, such as "run 3× a week". Each week counts as met once it reaches that many Yes days, and as missed once it can no longer get there; weeks still open are left out. Cards show "3 of 4 weeks met · this week 2 of 3", the chart shows Yes days per week against the goal, and streaks count weeks.
-- Numbers and scales can aim for "at least" or "at most" the target each time, such as at least 4 family meals a week. The score is the share of recent values that reached the target, with no trajectory or plan line.
+- Numbers and scales can aim for "at least" or "at most" the target each time, such as at least 4 family meals a week. The score is the share of recent values that reached the target, with no plan line or projected progress.
 
 ## 0.12.0
 

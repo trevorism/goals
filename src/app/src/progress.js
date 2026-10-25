@@ -351,10 +351,11 @@ function targetLine(metric, target, yAdjust, content = `Target ${withUnit(metric
   }
 }
 
-export function weeklyYesCounts(observations, now) {
+export function weeklyYesCounts(observations, now, startDate) {
+  const firstDay = periodOf(startDate, 'daily')
   const answers = new Map()
   ;[...observations]
-    .filter((observation) => !observation.missed && observation.observedAt && time(observation.observedAt) <= time(now))
+    .filter((observation) => !observation.missed && observation.observedAt && time(observation.observedAt) <= time(now) && periodOf(observation.observedAt, 'daily') >= firstDay)
     .sort((a, b) => time(a.observedAt) - time(b.observedAt) || time(a.createdDate ?? 0) - time(b.createdDate ?? 0))
     .forEach((observation) => answers.set(periodOf(observation.observedAt, 'daily'), observation.value === 1))
   const counts = new Map()
@@ -370,7 +371,7 @@ export function buildWeeklyCountChart(metric, goal, observations, now, segments 
   const annotations = adjustmentMarkers(segments)
   annotations.target = targetLine(metric, times, -10, `${times}× per week`)
   const start = time(goal.startDate)
-  const points = weeklyYesCounts(observations, now).map((point) => ({ x: Math.max(point.x, start), y: point.y }))
+  const points = weeklyYesCounts(observations, now, goal.startDate).map((point) => ({ x: Math.max(point.x, start), y: point.y }))
   const datasets = [{ label: 'Yes days', data: points, ...pointStyle(chartColors.values) }]
   const options = baseOptions(goal, now, { min: 0, max: 7, ticks: { stepSize: 1 } }, annotations, false)
   options.plugins.tooltip.callbacks.label = (item) => `${item.parsed.y} yes that week`

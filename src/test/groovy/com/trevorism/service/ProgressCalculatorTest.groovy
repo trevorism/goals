@@ -469,6 +469,18 @@ class ProgressCalculatorTest {
     }
 
     @Test
+    void testTimesPerWeekLeavesOutYesDaysBeforeAMidweekGoalStart() {
+        GoalMetric running = metric(type: MetricType.BOOLEAN, timesPerWeek: 3d)
+        ProgressCalculator firstWeek = new ProgressCalculator(day(2))
+
+        MetricProgress result = firstWeek.metricProgress(running, goal("g"), answers([(-3): true, (-2): true, 0: true]))
+
+        assert result.currentPeriodCount == 1
+        assert result.answeredPeriods == 0
+        assert result.currentStreak == 0
+    }
+
+    @Test
     void testTheOwnersLocalDayDecidesWhatCountsAsToday() {
         GoalMetric walked = metric(type: MetricType.BOOLEAN)
         ProgressCalculator eveningInNewYork = new ProgressCalculator(NOW, START.plusDays(49))

@@ -118,6 +118,7 @@ class MetricService {
                     "a scale metric requires scaleMin < scaleMax")
         }
         if (metric.direction in [MetricDirectionType.AT_LEAST, MetricDirectionType.AT_MOST]) {
+            require(metric.type in [MetricType.NUMERIC, MetricType.SCALE], "at least and at most apply to numeric and scale metrics")
             require(metric.target != null, "an at least or at most metric requires a target")
         }
         if (metric.timesPerWeek) {
