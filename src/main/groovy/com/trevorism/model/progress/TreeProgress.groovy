@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonInclude
 class TreeProgress {
 
     Date asOf
+    String today
     List<GoalProgress> goals = []
     List<MetricProgress> metrics = []
     List<MetricSegment> segments = []

@@ -17,10 +17,6 @@ When(~/^I GET "(.*)" anonymously$/) { String path ->
     anonGet(path)
 }
 
-When(~/^I POST "(.*)" anonymously$/) { String path ->
-    anonPost(path, [:])
-}
-
 Then(~/^the dashboard shows the root goal with its progress$/) { ->
     fetchDashboard()
     Map row = dashboard.goals.find { it.goal.id == root.id }
@@ -216,15 +212,3 @@ When(~/^I add a child that ends after the root goal$/) { ->
     attemptAuthenticatedPost("api/goal/${root.id}/child", [title: "too late", endDate: GoalsWorld.daysFromToday(365)])
 }
 
-When(~/^I list the measurements I can use$/) { ->
-    fetchMeasurements()
-}
-
-Then(~/^"(.*)" is not offered$/) { String measurementId ->
-    assert measurements != null
-    assert !measurements*.id.contains(measurementId)
-}
-
-When(~/^I add a metric measured by "(.*)"$/) { String measurementId ->
-    attemptAuthenticatedPost("api/goal/${root.id}/metric", [name: "${GoalsWorld.MARKER} measured".toString(), source: "http", measurementId: measurementId])
-}

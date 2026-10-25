@@ -73,7 +73,7 @@ describe('metrics', () => {
       type: 'numeric',
       measures: 'outcome',
       frequency: 'daily',
-      source: 'manual',
+      enabled: true,
       direction: 'decrease',
       baseline: 62,
       target: 55,
@@ -113,11 +113,12 @@ describe('metrics', () => {
     expect(validateMetric({ ...base, name: 'x' })).toBe('')
   })
 
-  it('opens metrics once asked in prompt as entered by hand', () => {
-    expect(metricFormFrom({ name: 'x', source: 'prompt', promptText: 'Q?' }).source).toBe('manual')
-    expect(metricFormFrom({ name: 'x', source: 'http', measurementId: 'm' }).source).toBe('http')
-    expect(metricFormFrom(null).source).toBe('manual')
-    expect(buildMetricPayload({ ...metricFormFrom(null), name: 'Walked' })).not.toHaveProperty('promptText')
+  it('keeps a metric active unless it was paused', () => {
+    expect(metricFormFrom(null).enabled).toBe(true)
+    expect(metricFormFrom({ name: 'x' }).enabled).toBe(true)
+    expect(metricFormFrom({ name: 'x', enabled: false }).enabled).toBe(false)
+    expect(buildMetricPayload({ ...metricFormFrom({ name: 'x', enabled: false }), name: 'x' })).toMatchObject({ enabled: false })
+    expect(buildMetricPayload({ ...metricFormFrom(null), name: 'Walked' })).not.toHaveProperty('source')
   })
 
   it('prefills an edit form from a stored metric', () => {

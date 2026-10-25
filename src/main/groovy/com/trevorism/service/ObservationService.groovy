@@ -8,6 +8,8 @@ import com.trevorism.model.types.MetricType
 import jakarta.inject.Named
 import jakarta.inject.Singleton
 
+import java.time.Clock
+
 import static com.trevorism.service.Validation.require
 import static com.trevorism.service.Validation.requireOneOf
 
@@ -16,11 +18,15 @@ class ObservationService {
 
     private final OwnedRepository<GoalMetric> metricRepository
     private final OwnedRepository<GoalObservation> observationRepository
+    private final ProfileService profileService
+    Clock clock = Clock.systemUTC()
 
     ObservationService(@Named("metric") OwnedRepository<GoalMetric> metricRepository,
-                       @Named("observation") OwnedRepository<GoalObservation> observationRepository) {
+                       @Named("observation") OwnedRepository<GoalObservation> observationRepository,
+                       ProfileService profileService) {
         this.metricRepository = metricRepository
         this.observationRepository = observationRepository
+        this.profileService = profileService
     }
 
     List<GoalObservation> listForMetric(String ownerId, String metricId) {
@@ -31,7 +37,7 @@ class ObservationService {
     GoalObservation create(String ownerId, String metricId, GoalObservation observation) {
         GoalMetric metric = metricRepository.get(ownerId, metricId)
         observation.metricId = metric.id
-        observation.observedAt = observation.observedAt ?: new Date()
+        observation.observedAt = observation.observedAt ?: profileService.localDayStart(ownerId, clock.instant())
         observation.metricSource = observation.metricSource ?: MetricSourceType.MANUAL
         requireOneOf(observation.metricSource, MetricSourceType.ALL, "metricSource")
         observation.missed = observation.missed ?: false

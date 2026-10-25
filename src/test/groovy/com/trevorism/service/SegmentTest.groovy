@@ -77,6 +77,40 @@ class SegmentTest {
     }
 
     @Test
+    void testTheOwnersLocalTodayIncludesTodaysAdjustmentAndValues() {
+        GoalMetric weight = new GoalMetric(id: "w", goalId: "g", type: MetricType.NUMERIC, direction: MetricDirectionType.DECREASE)
+        ProgressCalculator earlyMorningEastOfUtc = new ProgressCalculator(new Date(day(60).time - 3 * 3600 * 1000), START.plusDays(60))
+
+        List<MetricSegment> segments = earlyMorningEastOfUtc.segments(weight, goal, line(50..60, 200d, -0.2d), [adjustment("a", 60)])
+
+        assert segments*.adjustmentId == [null, "a"]
+        assert segments[1].count == 1
+    }
+
+    @Test
+    void testAnAdjustmentStampedEarlierTodaySplitsTheHistoryWestOfUtc() {
+        GoalMetric weight = new GoalMetric(id: "w", goalId: "g", type: MetricType.NUMERIC, direction: MetricDirectionType.DECREASE)
+        Date now = new Date(day(60).time + 2 * 3600 * 1000)
+        ProgressCalculator eveningWestOfUtc = new ProgressCalculator(now, START.plusDays(59))
+        GoalAdjustment stampedAnHourAgo = new GoalAdjustment(id: "a", goalId: "g", title: "change a", effectiveDate: new Date(now.time - 3600 * 1000))
+
+        List<MetricSegment> segments = eveningWestOfUtc.segments(weight, goal, line(40..59, 200d, -0.2d), [stampedAnHourAgo])
+
+        assert segments*.adjustmentId == [null, "a"]
+    }
+
+    @Test
+    void testYesNoSegmentsCountOnlyRecordedDays() {
+        GoalMetric walked = new GoalMetric(id: "y", goalId: "g", type: MetricType.BOOLEAN, frequency: FrequencyType.DAILY)
+        List<GoalObservation> answers = ((40..49).step(2) + (50..54)).collect { new GoalObservation(observedAt: day(it), value: 1d) }
+
+        List<MetricSegment> segments = calculator.segments(walked, goal, answers, [adjustment("a", 50)])
+
+        assert segments*.count == [5, 5]
+        assert segments*.adherence == [1d, 1d]
+    }
+
+    @Test
     void testOnlyAdjustmentsAfterTheStartAndUpToNowSplitTheHistory() {
         GoalMetric weight = new GoalMetric(id: "w", goalId: "g", type: MetricType.NUMERIC)
 

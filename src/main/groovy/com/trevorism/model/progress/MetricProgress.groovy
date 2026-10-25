@@ -20,8 +20,13 @@ class MetricProgress {
     Double projectedEnd
     Double projectedProgress
     Date projectedTargetDate
+    Double requiredRate
+    Double recentRate
+    Boolean stalled
 
     Double adherence
+    Integer answeredPeriods
+    Integer windowPeriods
     Integer currentStreak
     Integer bestStreak
 }

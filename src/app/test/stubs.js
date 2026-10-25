@@ -12,6 +12,11 @@ export const stubs = {
     emits: ['update:modelValue'],
     template: '<div class="va-select" :data-label="label" :data-disabled="disabled" :data-value="JSON.stringify(modelValue)"></div>'
   },
+  'va-switch': {
+    props: ['modelValue', 'label'],
+    emits: ['update:modelValue'],
+    template: '<input type="checkbox" class="va-switch" :data-label="label" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />'
+  },
   'va-date-input': { props: ['modelValue', 'label'], template: '<div class="va-date-input" :data-label="label"></div>' },
   'va-button': {
     props: ['preset', 'loading'],

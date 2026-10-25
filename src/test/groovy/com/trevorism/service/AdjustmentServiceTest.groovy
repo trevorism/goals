@@ -3,8 +3,12 @@ package com.trevorism.service
 import com.trevorism.model.Goal
 import com.trevorism.model.GoalAdjustment
 import com.trevorism.model.GoalMetric
+import com.trevorism.model.GoalProfile
 import com.trevorism.support.TestStore
 import org.junit.jupiter.api.Test
+
+import java.time.Clock
+import java.time.ZoneOffset
 
 import static com.trevorism.service.GoalServiceTest.assertBadRequest
 import static com.trevorism.service.GoalServiceTest.assertNotFound
@@ -27,6 +31,15 @@ class AdjustmentServiceTest {
         assert adjustment.category == "other"
         assert adjustment.metricIds == []
         assert adjustment.effectiveDate
+    }
+
+    @Test
+    void testAnUndatedAdjustmentStartsOnTheOwnersLocalDay() {
+        store.profileService().update(OWNER, new GoalProfile(timezone: "America/New_York"))
+        service.clock = Clock.fixed(day(41).toInstant().plusSeconds(2 * 3600), ZoneOffset.UTC)
+        Goal root = store.goalService().createRoot(OWNER, rootGoal())
+
+        assert service.create(OWNER, root.id, new GoalAdjustment(title: "Walk after lunch")).effectiveDate == day(40)
     }
 
     @Test

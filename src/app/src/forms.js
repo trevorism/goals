@@ -1,4 +1,4 @@
-import { MetricDirectionType, MetricSourceType, MetricType } from './types.js'
+import { MetricDirectionType, MetricType } from './types.js'
 
 const pad = (number) => String(number).padStart(2, '0')
 
@@ -70,10 +70,7 @@ export function buildMetricPayload(form) {
     type: form.type,
     measures: form.measures,
     frequency: form.frequency,
-    source: form.source
-  }
-  if (form.source === MetricSourceType.HTTP) {
-    payload.measurementId = form.measurementId
+    enabled: form.enabled
   }
   if (form.type === MetricType.NUMERIC || form.type === MetricType.SCALE) {
     payload.direction = form.direction
@@ -108,9 +105,6 @@ export function validateMetric(form) {
   if (!form.name?.trim()) {
     return 'Enter a name'
   }
-  if (form.source === MetricSourceType.HTTP && !form.measurementId) {
-    return 'Choose what to measure'
-  }
   if (form.type === MetricType.SCALE) {
     const min = toNumber(form.scaleMin)
     const max = toNumber(form.scaleMax)
@@ -140,8 +134,7 @@ export function metricFormFrom(metric) {
     type: metric?.type ?? MetricType.NUMERIC,
     measures: metric?.measures ?? 'outcome',
     frequency: metric?.frequency ?? 'daily',
-    source: metric?.source === MetricSourceType.HTTP ? MetricSourceType.HTTP : MetricSourceType.MANUAL,
-    measurementId: metric?.measurementId ?? '',
+    enabled: metric?.enabled !== false,
     direction: metric?.direction ?? MetricDirectionType.INCREASE,
     unit: metric?.unit ?? '',
     baseline: metric?.baseline ?? '',

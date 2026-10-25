@@ -5,6 +5,8 @@ import jakarta.inject.Named
 import jakarta.inject.Singleton
 
 import java.time.DateTimeException
+import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
 
@@ -38,6 +40,14 @@ class ProfileService {
     ZoneId zoneFor(String ownerId) {
         String timezone = find(ownerId)?.timezone
         isValidZone(timezone) ? ZoneId.of(timezone) : ZoneOffset.UTC
+    }
+
+    LocalDate localDate(String ownerId, Instant instant) {
+        instant.atZone(zoneFor(ownerId)).toLocalDate()
+    }
+
+    Date localDayStart(String ownerId, Instant instant) {
+        Date.from(localDate(ownerId, instant).atStartOfDay(ZoneOffset.UTC).toInstant())
     }
 
     private GoalProfile find(String ownerId) {

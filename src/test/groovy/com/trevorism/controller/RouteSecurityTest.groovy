@@ -14,7 +14,7 @@ import java.lang.reflect.Method
 class RouteSecurityTest {
 
     private static final List<Class> ROUTE_ANNOTATIONS = [Get, Post, Put, Patch, Delete]
-    private static final List<Class> USER_CONTROLLERS = [GoalController, MetricController, ObservationController, AdjustmentController, TodayController, ProfileController, DashboardController, DelegateController, MeasurementController]
+    private static final List<Class> USER_CONTROLLERS = [GoalController, MetricController, ObservationController, AdjustmentController, TodayController, ProfileController, DashboardController, DelegateController]
 
     private static List<Method> routesOf(Class controller) {
         controller.declaredMethods.findAll { Method method -> ROUTE_ANNOTATIONS.any { method.isAnnotationPresent(it) } }
@@ -24,7 +24,7 @@ class RouteSecurityTest {
     void testEveryUserDataRouteRequiresAUserAndRejectsInternalTokens() {
         List<Method> routes = USER_CONTROLLERS.collectMany { routesOf(it) }
 
-        assert routes.size() == 30
+        assert routes.size() == 29
         routes.each { Method route ->
             Secure secure = route.getAnnotation(Secure)
             assert secure, "${route.declaringClass.simpleName}.${route.name} has no @Secure"
@@ -36,19 +36,10 @@ class RouteSecurityTest {
     @Test
     void testDataControllersResolveTheOwnerThroughDelegationAndOthersDoNot() {
         List<Class> delegable = [GoalController, MetricController, ObservationController, AdjustmentController, TodayController, DashboardController]
-        List<Class> ownerOnly = [ProfileController, DelegateController, MeasurementController]
+        List<Class> ownerOnly = [ProfileController, DelegateController]
 
         delegable.each { assert it.declaredFields*.type.contains(com.trevorism.service.OwnerResolver), "${it.simpleName} must use OwnerResolver" }
         ownerOnly.each { assert !it.declaredFields*.type.contains(com.trevorism.service.OwnerResolver), "${it.simpleName} must stay owner-only" }
-    }
-
-    @Test
-    void testCollectionRoutesRequireTheSystemRole() {
-        Map<String, Secure> secured = routesOf(CollectionController).collectEntries { [it.name, it.getAnnotation(Secure)] }
-
-        assert secured.keySet() == ["tick", "provision"] as Set
-        assert secured.tick.value() == Roles.SYSTEM && secured.tick.allowInternal()
-        assert secured.provision.value() == Roles.SYSTEM && !secured.provision.allowInternal()
     }
 
     @Test

@@ -8,7 +8,6 @@ import com.trevorism.model.GoalObservation
 import com.trevorism.model.GoalProfile
 import com.trevorism.service.AdjustmentService
 import com.trevorism.service.GoalService
-import com.trevorism.service.MeasurementCatalog
 import com.trevorism.service.MetricService
 import com.trevorism.service.ObservationService
 import com.trevorism.service.OwnedRepository
@@ -38,11 +37,11 @@ class TestStore {
     }
 
     MetricService metricService() {
-        new MetricService(goalRepository, metricRepository, observationRepository, new MeasurementCatalog())
+        new MetricService(goalRepository, metricRepository, observationRepository)
     }
 
     ObservationService observationService() {
-        new ObservationService(metricRepository, observationRepository)
+        new ObservationService(metricRepository, observationRepository, profileService())
     }
 
     ProfileService profileService() {
@@ -50,7 +49,7 @@ class TestStore {
     }
 
     AdjustmentService adjustmentService() {
-        new AdjustmentService(goalRepository, metricRepository, adjustmentRepository)
+        new AdjustmentService(goalRepository, metricRepository, adjustmentRepository, profileService())
     }
 
     static Date day(int dayOfYear) {

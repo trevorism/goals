@@ -98,7 +98,7 @@ onMounted(loadObservations)
 </script>
 
 <template>
-  <va-card class="metric-card">
+  <va-card class="metric-card" :class="{ 'paused opacity-60': metric.enabled === false }">
     <va-card-title class="flex items-center justify-between gap-2">
       <span class="metric-name text-base">{{ metric.name }}</span>
       <span class="flex items-center gap-1">
@@ -110,7 +110,7 @@ onMounted(loadObservations)
       <metric-form v-if="editing" :metric="metric" :saving="saving" @save="save" @cancel="editing = false" />
       <template v-else>
         <p class="metric-summary text-sm text-slate-500">
-          {{ metric.frequency }}<span v-if="metric.source === 'http'" class="measured-automatically"> · measured automatically</span><span v-if="target"> · target {{ target }}</span>
+          {{ metric.frequency }}<span v-if="target"> · target {{ target }}</span><span v-if="metric.enabled === false" class="paused-label"> · paused</span>
         </p>
         <div v-if="metricProgress && metric.type !== 'text'" class="metric-progress flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
           <progress-status :status="metricProgress.status" />

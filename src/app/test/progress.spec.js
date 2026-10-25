@@ -103,10 +103,10 @@ describe('adherence', () => {
   const walked = { type: 'boolean', frequency: 'daily', target: 0.8 }
   const answers = (byDay) => Object.entries(byDay).map(([offset, yes]) => ({ observedAt: day(Number(offset)), value: yes ? 1 : 0 }))
 
-  it('rolls adherence day by day, counting unanswered days as no', () => {
-    const series = rollingAdherence(walked, goal, answers({ 46: true, 48: true, 49: true }), now)
+  it('rolls adherence day by day over recorded days only', () => {
+    const series = rollingAdherence(walked, goal, answers({ 46: true, 47: false, 49: true }), now)
 
-    expect(series.map((point) => Math.round(point.y))).toEqual([100, 50, 67, 75])
+    expect(series.map((point) => Math.round(point.y))).toEqual([100, 50, 50, 67])
     expect(series[series.length - 1].x).toBe(start + 49 * DAY)
   })
 
@@ -150,8 +150,20 @@ describe('progress facts', () => {
     expect(facts[2]).toBe('fit r² 0.91 over 12 values')
   })
 
+  it('describes the required and recent rates, and drops the projection when the trend has stalled', () => {
+    const weight = { type: 'numeric', unit: 'lb' }
+
+    expect(describeMetricProgress(weight, { requiredRate: -1.3, recentRate: -0.04, projectedEnd: 207.1, stalled: true }))
+      .toEqual(['needs −1.3 lb/wk', 'recent trend 0.0 lb/wk'])
+    expect(describeMetricProgress(weight, { requiredRate: -1.3, recentRate: -1.5, projectedEnd: 199, stalled: false }))
+      .toEqual(['needs −1.3 lb/wk', 'recent trend −1.5 lb/wk', 'on this trend, 199 lb by the end'])
+  })
+
   it('describes adherence and streaks', () => {
-    expect(describeMetricProgress({ type: 'boolean', frequency: 'daily' }, { adherence: 0.75, currentStreak: 3, bestStreak: 5 })).toEqual(['75% yes, last 4 weeks', 'streak 3 (best 5)'])
+    expect(describeMetricProgress({ type: 'boolean', frequency: 'daily' }, { adherence: 0.75, answeredPeriods: 20, windowPeriods: 28, currentStreak: 3, bestStreak: 5 }))
+      .toEqual(['75% yes on 20 of 28 days recorded', 'streak 3 (best 5)'])
+    expect(describeMetricProgress({ type: 'boolean', frequency: 'weekly' }, { adherence: 1, answeredPeriods: 1, windowPeriods: 4 }))
+      .toEqual(['100% yes on 1 of 4 weeks recorded (partial data)'])
     expect(describeMetricProgress({ type: 'numeric' }, null)).toEqual([])
   })
 })
@@ -224,12 +236,22 @@ describe('dashboard headline', () => {
   const goalRow = (metric, metricProgress, progress = {}) => ({ goal: { endDate: day(100) }, progress, headlineMetric: metric, headlineMetricProgress: metricProgress })
 
   it('describes a habit headline by its share of yes answers', () => {
-    expect(describeHeadline(goalRow({ name: 'Walked', type: 'boolean', target: 0.85 }, { adherence: 0.7, score: 0.82 }))).toBe('Walked: 70% yes (target 85%)')
+    expect(describeHeadline(goalRow({ name: 'Walked', type: 'boolean', target: 0.85 }, { adherence: 0.7, score: 0.82 }))).toBe('Walked: 70% yes on recorded days (target 85%)')
+    expect(describeHeadline(goalRow({ name: 'Worked on it', type: 'boolean', frequency: 'weekly' }, { adherence: 0.75, score: 0.75 }))).toBe('Worked on it: 75% yes on recorded weeks')
+  })
+
+  it('names the required rate instead of a projection when the recent trend has stalled', () => {
+    const weight = { name: 'Weight', type: 'numeric', unit: 'lb', target: 200, direction: 'decrease' }
+    const stalled = { score: 0.3, projectedEnd: 207.1, requiredRate: -1.3, recentRate: 0, stalled: true }
+
+    expect(describeHeadline(goalRow(weight, stalled))).toBe('Weight: needs −1.3 lb/wk to reach 200 lb by Apr 11, 2027, recent trend 0.0 lb/wk')
+    expect(describeHeadline(goalRow(weight, { ...stalled, stalled: false }))).toContain('on this trend, 207.1 lb')
+    expect(describeHeadline(goalRow({ ...weight, target: null }, stalled))).toContain('on this trend')
   })
 
   it('falls back to the score, then to effort, then to a hint', () => {
     expect(describeHeadline(goalRow({ name: 'Energy', type: 'scale', direction: 'increase' }, { score: 0.5 }))).toBe('Energy: 50% of the way to target')
-    expect(describeHeadline(goalRow(null, null, { effortProgress: 0.4 }))).toBe('40% of sub-goals and habits on track')
+    expect(describeHeadline(goalRow(null, null, { effortProgress: 0.4 }))).toBe('Effort 40% across sub-goals and habits')
     expect(describeHeadline(goalRow(null, null, {}))).toBe('Add a metric with a target to track this goal')
   })
 })

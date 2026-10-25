@@ -11,7 +11,7 @@ Goals turns long-term intentions into outcomes. Each goal goes through a loop:
 2. **Decompose** it into sub-goals, and decompose those until each leaf is a concrete step that can
    be done within about a week.
 3. **Measure** progress at every level, with numeric and qualitative metrics. Measurements are
-   recorded by hand in goals, or measured automatically. Goals is the one place values are recorded.
+   recorded by hand in goals, which is the one place values are recorded.
 4. **Learn:** compare progress with the plan, record adjustments (behavior changes), and see which
    changes moved the trend.
 5. **Automate** steps one level at a time, from "I do this" toward "the platform does this". A goal
@@ -27,10 +27,12 @@ tree is working.
   outcome stays flat, the decomposition is wrong. The UI shows both numbers.
 - **The human approves structure and spend.** The system can propose sub-goals and actions. Nothing
   is created, sent or paid for without approval, unless the user has explicitly automated that step.
-- **One place to record.** Every value is entered in goals or measured by goals. Goals doesn't send
+- **One place to record.** Every value is entered in goals. Goals doesn't send
   questions to another app to be answered there, so a value is never recorded in two places.
 - **Use the platform.** Use the `schedule`, `event`, `email`, `chat` and datastore services
   rather than building parallel mechanisms.
+- **Honest about missing data.** The owner leaves some periods unrecorded on purpose. An unrecorded
+  period is unknown, never a No, and every score says how much data it rests on.
 - **Start as one service, and keep the split possible.** Collection and measurement sit behind
   interfaces, so a later `measure` service can be extracted by moving code.
 - **Goals are private.** Every read and write is scoped to the owner. Public or shared goals come
@@ -75,8 +77,8 @@ These three goals are test cases for every phase. Each one exercises a different
 
 ### 2.3 Get paying customers on the Trevorism platform (outcome, ends 2027-06-30)
 - Lag metrics:
-  - `paying customers`: numeric, 0 → N, **measured** by an HTTP pull from `billing`
-    (`GET /api/payment`, counting distinct customers with confirmed receives).
+  - `paying customers`: numeric, 0 → N, recorded by hand. (A billing measurement was tried in
+    0.10.0 and removed in 0.12.0, section 6.)
   - `MRR`: numeric, from `stripe` or `billing`.
 - Children:
   - Choose a first offering (milestone).
@@ -96,8 +98,8 @@ These three goals are test cases for every phase. Each one exercises a different
  browser ── /api/auth ─┤ ui-auth session │ goal │ measurement │ analysis │ decompose │ automation │ notify │
                        └──────┬──────────────┬───────────┬───────────┬──────────┬──────────┬─────────┘
                               │              │           │           │          │          │
-                       datastore svc    billing svc   event svc   chat svc   schedule   email svc
-                       (all entities)   (measured)    (subscribe) (decompose) (daily tick)
+                       datastore svc                event svc   chat svc              email svc
+                       (all entities)               (subscribe) (decompose)
 ```
 
 - **One service, `goals`:**
@@ -111,7 +113,7 @@ These three goals are test cases for every phase. Each one exercises a different
 - **Package layout:** the template's layer packages (`com.trevorism.{controller, service, model,
   config}`). Collection and measurement code is reached only through service interfaces, so a later
   `measure` service can take those classes with it.
-- **Hosting:** App Engine, F1 to start. The only background work is one daily schedule tick.
+- **Hosting:** App Engine, F1 to start. There is no background work; everything is computed on request.
   Hourly jobs cost about 0.8 instance-hours per clock hour, so we avoid them.
 
 ## 4. Domain model
@@ -145,7 +147,7 @@ from stored entities:
 | `MetricMeasuresType` | `GoalMetric.measures` | `outcome` (lag) \| `effort` (lead) |
 | `MetricDirectionType` | `GoalMetric.direction` | `increase` \| `decrease` \| `maintain` |
 | `FrequencyType` | `GoalMetric.frequency` | `daily` \| `weekly` \| `monthly` |
-| `MetricSourceType` | `GoalMetric.source`, `GoalObservation.source` | `manual` \| `http` \| `event` \| `aggregation` (observations from before 0.11.0 may say `prompt`) |
+| `MetricSourceType` | `GoalMetric.source`, `GoalObservation.source` | `manual` (older observations may say `prompt` or `http`) |
 | `AdjustmentCategoryType` | `GoalAdjustment.category` | `habit` \| `tool` \| `environment` \| `plan` \| `other` |
 
 ### 4.1 Goal (the tree node)
@@ -178,8 +180,7 @@ from stored entities:
 | choices | `[{value, label}]`. A missing value is derived from the label (`"Just OK"` → `just-ok`) and made unique. Boolean metrics always get `yes`/`no`. |
 | frequency | `FrequencyType`; `daily` by default |
 | source | `MetricSourceType`; `manual` by default |
-| measurementid | With `source = http`, the id of a measurement in the catalog (section 8.3). The metric's type must match the measurement's. Cleared (set to empty) when the source changes to anything else. |
-| nextdueat, lastobservedat, enabled | `lastobservedat` is the date of the most recent observation, kept up to date when values are recorded, edited or deleted. The Today view uses it to find what's due without querying observations. Datastore can't clear a field, so deleting every observation leaves the last date in place. |
+| nextdueat, lastobservedat, enabled | `lastobservedat` is the date of the most recent observation, kept up to date when values are recorded, edited or deleted. The Today view uses it to find what's due without querying observations. Datastore can't clear a field, so deleting every observation leaves the last date in place. `enabled = false` pauses a metric: it leaves Today and its goal's progress, and its card is greyed out. |
 
 ### 4.3 Observation
 | Field | Notes |
@@ -190,8 +191,8 @@ from stored entities:
 | choice | Boolean and choice metrics: the selected choice's value |
 | label | The selected choice's label, or the text answer |
 | note | |
-| metricsource, sourceref | `metricsource` is how the value was collected (`MetricSourceType`); `sourceref` is the id of the record it came from, e.g. `http` + the measurement id. Manual entries have no `sourceref`. |
-| missed | `true` for a period nobody answered (only from prompt collection before 0.11.0) |
+| metricsource, sourceref | `metricsource` is how the value was collected (`MetricSourceType`); `sourceref` is the id of the record it came from, e.g. a prompt answer id on values recorded before 0.11.0. Manual entries have no `sourceref`. |
+| missed | `true` for a period nobody answered (only from prompt collection before 0.11.0). Treated as unrecorded. |
 
 ### 4.4 Adjustment
 `id, ownerid, goalid, metricids[] (empty = all metrics in the subtree), effectivedate, title,
@@ -206,12 +207,10 @@ status (pending_approval|approved|rejected|running|succeeded|failed), approvalqu
 requestsummary, resultsummary, error`
 
 ### 4.7 Profile
-`id, ownerid, email, username, timezone, digestday, digestenabled, offtrackemails`
+`id, ownerid, timezone, createddate`
 
-- `email` and `username` are copied from auth `GET /user/me` the first time the user loads the app,
-  and refreshed on later logins.
-- The daily tick runs with no user session, so it reads email addresses from Profile rather than
-  calling auth.
+- The UI saves the browser's IANA timezone once per session when it differs. Progress uses it to
+  decide the owner's local today.
 
 ## 5. Measurement types and scoring
 
@@ -221,13 +220,13 @@ scored metric produces a **progress score p ∈ [0, 1]**. `ProgressCalculator` c
 | Type | Collected as | Score p | Chart |
 |---|---|---|---|
 | numeric | number | `clamp((current − baseline) / (target − baseline))`. `current` is the fitted value at the latest observation (the latest value when there are fewer than 3). A missing baseline uses the first value; no target means no score. For `maintain`, the share of the last 7 values within `tolerance` of the target. | Values, trend fit, plan line, target line or tolerance band |
-| boolean | Yes/No → 1/0 | `min(adherence / target, 1)`, or adherence when there's no target. Adherence is the share of periods answered Yes over the last 28 days (daily) or 4 periods (weekly, monthly), counted from the first answer. Unanswered past periods count as No; an unanswered current period doesn't count yet. The latest answer in a period wins. | Rolling adherence line with a target line; current and best streak |
+| boolean | Yes/No → 1/0 | `min(adherence / target, 1)`, or adherence when there's no target. Adherence is the share of **recorded** periods answered Yes over the last 28 days (daily) or 4 periods (weekly, monthly), counted from the first answer. Unrecorded periods are left out; `answeredperiods` of `windowperiods` reports the coverage, and the UI marks coverage under half as partial data. The window ends today when today is recorded, otherwise yesterday, so it always spans a full 28 days or 4 periods. No recorded period in the window means no score. The latest answer in a period wins. | Rolling adherence over recorded periods with a target line; current and best streak, where unrecorded periods don't break a streak |
 | scale | scale points | Mean of the last 7 values, normalized between baseline and target (defaulting to the scale's ends) | Values, trend fit, plan line, target line |
 | choice | choices, ordered worst to best | Mean of position ÷ (choices − 1) over the last 7 answers | Answers on a worst→best axis |
 | text | free text | Not scored | None; the journal list under the card |
 
-Missed observations (left from prompt collection) and observations dated in the future are ignored, except that a missed yes/no period
-counts as No.
+Missed observations (left from prompt collection) count as unrecorded. Observations dated after the
+owner's local today are ignored. "Today" is the owner's local date, from the profile timezone.
 
 ### Expected progress
 - **Progress metrics** (numeric and scale that increase or decrease) follow a linear plan:
@@ -238,11 +237,19 @@ counts as No.
   that. **No data** when there's no score.
 - **At risk:** a metric that is ahead or on track, but whose trend projects below 0.9 of the way to
   its target at the end date.
+- **Required and recent rate** (numeric and scale with an explicit target, not `maintain`): `requiredrate` is the change per
+  week needed from the latest value to reach the target by the end date. `recentrate` is the fitted
+  change per week over the last 14 days, or over the last 5 values when 14 days hold fewer. A trend is
+  **stalled** when its recent rate moves toward the target at less than a quarter of the required
+  rate. A stalled metric names the required rate instead of the all-data projection, which a long
+  history can keep optimistic after progress stops.
 
 ### Rollup
 - **Outcome progress:** the mean score of the goal's own outcome metrics.
 - **Effort progress:** the mean of the goal's own effort metric scores and its sub-goals' progress.
-  A completed sub-goal counts as 1, an abandoned one is left out, and an unmeasured one counts as 0.
+  A completed sub-goal counts as 1. Abandoned sub-goals and sub-goals without data are left out;
+  `subgoalswithoutdata` counts the started ones so the UI can say what was left out. Paused metrics
+  are left out too. A goal with nothing left to score has no data.
 - **Headline:** outcome when the goal has scored outcome metrics, otherwise effort. A goal's
   progress and pace are the means over its headline items, so its status follows the same pace bands.
   A goal is at risk when it would otherwise be ahead or on track but one of its headline items is at
@@ -250,37 +257,17 @@ counts as No.
 - The UI shows both meters, with a marker on the headline meter at `progress − pace`: where the plan
   says the goal should be by now.
 
-## 6. Collection
+## 6. Recording
 
-### 6.1 Daily tick
-- The schedule task `goals_daily_tick` runs daily at 11:07 UTC (about 7am US Eastern) and sends
-  `POST /api/collect/tick`, secured with `@Secure(value = Roles.SYSTEM, allowInternal = true)`. Schedule
-  calls back with an internal token.
-- The tick is idempotent; running it twice in a period does nothing new. It:
-  1. For every enabled metric with `source = http` whose goal and ancestors are active and whose goal
-     dates include today, reads its catalogued measurement (section 8.3) and records the value for the
-     current period in the owner's timezone (`metricsource = http`, `sourceref` = the measurement id).
-     Each measurement is read at most once per tick, however many metrics use it; when that read
-     fails, every metric using it fails for the tick without another read. It skips the metric when
-     the period already has a value.
-  2. Returns counts: `measured`, `alreadyRecorded`, `failed`. A failure on one metric doesn't stop the
-     others, and a failed measurement is retried at the next tick.
-- One daily tick supports daily, weekly and monthly metrics without a schedule task per metric.
-- **Provisioning:** `POST /api/collect/provision` (`Roles.SYSTEM`) creates the `goals_daily_tick`
-  schedule task if it doesn't exist. It's run once against production with goals' app credentials.
-  PR environments are never provisioned, because they share production's datastore.
+Values are recorded in goals: on the Today page, which lists what's due in the current period, or on
+the goal page, which also takes past dates. Nothing is collected in the background.
 
-### 6.2 Sources
-
-`prompt` was a source until 0.11.0: the tick asked a private question in prompt and recorded the
-answer. It was removed because the same value could then be recorded in two places. Metrics that used
-it were switched to `manual`.
-
-| Source | Behavior |
-|---|---|
-| `manual` | Does nothing. The metric shows on the Today page until a value is recorded. |
-| `http` | The tick reads the metric's `measurementid` from the measurement catalog (section 8.3) once per period. The metric doesn't show on Today, but a value can still be entered by hand on the goal page. |
-| `event`, `aggregation` | Later in phase 5, when a real metric needs them. Choosing them does nothing yet. |
+- `prompt` collection was removed in 0.11.0, because the same value could then be recorded in two
+  places.
+- Measured metrics (the `http` source, the billing paying-customers measurement and the daily tick
+  that read it) were removed in 0.12.0. The measurement could never count a real customer, and no
+  other metric had a platform source. A future measured source starts from a real metric that needs
+  it.
 
 ## 7. Analysis
 
@@ -289,10 +276,12 @@ and the emails always agree. The response is two flat lists:
 
 ```
 { asof,
-  goals:   [{ goalid, parentid, progress, outcomeprogress, effortprogress, expected, pace, status }],
+  goals:   [{ goalid, parentid, progress, outcomeprogress, effortprogress, expected, pace, status,
+              subgoalswithoutdata }],
   metrics: [{ metricid, goalid, score, expected, status, current, observationcount,
               fitslope, fitintercept, fitr2, fitcount, projectedend, projectedprogress,
-              projectedtargetdate, adherence, currentstreak, beststreak }],
+              projectedtargetdate, requiredrate, recentrate, stalled,
+              adherence, answeredperiods, windowperiods, currentstreak, beststreak }],
   segments: [{ metricid, adjustmentid, adjustmenttitle, startdate, enddate, count, slope, adherence }] }
 ```
 
@@ -307,7 +296,7 @@ and the emails always agree. The response is two flat lists:
   goal's start and up to now. An adjustment applies to the metrics it lists, or, when it lists none,
   to every metric on its goal and the goal's sub-goals. The first segment has no adjustment. A number
   or scale segment with at least 5 values gets its own slope; a yes/no segment with at least 5 periods
-  gets its own adherence (unanswered past periods count as No). Choice and text metrics aren't
+  gets its own adherence over its recorded periods. Choice and text metrics aren't
   segmented. The UI compares neighbouring segments, e.g. "−0.4 → −0.5 lb/wk after “Cut evening
   snacks”" or "70% → 90% yes after “Walk right after lunch”", says how much data a new segment still
   needs, and notes that this shows correlation, not causation.
@@ -330,7 +319,7 @@ and the emails always agree. The response is two flat lists:
 
 ### 8.1 The automation ladder
 The `approved` and `automated` rungs (sections 8.2 and 8.3's action rows) are deferred until a real
-step needs them (section 12); the measurement catalog is live. When 5b is picked up, approvals
+step needs them (section 12). The `measured` rung has no source since 0.12.0. When 5b is picked up, approvals
 should follow the one-place principle (section 1) rather than move into prompt as sketched below.
 
 Phase 5 adds flat automation fields to `Goal` (for example `automationlevel`, `automationaction`), with an
@@ -384,30 +373,12 @@ service list.
 - Actions run with goals' app identity, so each action checks that its parameters only touch the
   owner's resources.
 
-**Measurement catalog (5a):** read actions are fixed measurements, not a service and path the user
-types in. The datastore namespace is shared between apps, and goals' token can read across it, so a
-user-supplied kind or path would let any user read another app's data through goals.
-- `MeasurementCatalog` defines each measurement in code: `id`, `label`, `description`, `metricType`,
-  `unit`, and the roles allowed to use it. `HttpMeasurementReader` turns the service's response into
-  a number.
-- A metric's `measurementid` is checked against the catalog when the metric is saved. Choosing a
-  measurement, or switching to `http`, requires one of its roles **on the requester's own token**. A
-  delegate acting with `?onBehalfOf=` gets no measurement roles, so it can't attach business-wide data
-  to someone's goals. Later edits that leave the measurement alone aren't rechecked.
-- `GET /api/measurement` lists the measurements the caller can use. It stays owner-only, and a call
-  with `?onBehalfOf=` naming someone else lists nothing.
-
-| measurementid | Roles | Value |
-|---|---|---|
-| `billing.paying-customers` | `admin` | Distinct `ownerId`s among `CONFIRMED` `RECEIVE` transactions from `billing GET /api/payment`, counting real-money providers only (`stripe` and `*-mainnet`) |
-
 ## 9. Security
 
 - `/api/auth/*` comes from `micronaut-ui-auth`. The frontend uses `@trevorism/ui-auth`
   (`app.use(TrevorismAuth, { router })`, with `meta.requiresAuth` on every route except splash).
 - **Every** route has an explicit `@Secure`, because `@Secure` is fail-open:
   - User routes: `@Secure(Roles.USER)`.
-  - Tick: `@Secure(value = Roles.SYSTEM, allowInternal = true)`.
   - Event receivers, when there are any: `@Secure(value = Roles.USER, allowInternal = true)`, and
     they re-verify the data against its source.
 - **Ownership:** all persistence goes through `OwnedRepository<T>`, which sets `ownerid` from the
@@ -473,15 +444,12 @@ alert emails**. Status lives on an in-app dashboard that the owner opens when th
 | `GET/POST /goal/{id}/adjustment`, `PUT/DELETE /adjustment/{id}` | Adjustments |
 | `POST /goal/{id}/decompose` | Propose children (section 11.3); persists nothing |
 | `POST /goal/{id}/decompose/accept` | Create the accepted children |
-| `GET /measurement` | The catalogued measurements the caller may attach to a metric (section 8.3) |
 | `PUT /goal/{id}/automation`, `GET /goal/{id}/automation/run` | Automation settings and run log |
 | `GET /dashboard?date=yyyy-MM-dd` | Every root goal's status and headline, plus needs-you items |
 | `GET /today?date=yyyy-MM-dd` | Metrics with nothing recorded in their current day, week or month, for the caller's local date (manual metrics) |
-| `POST /collect/tick` | Daily tick (SYSTEM or internal) |
-| `POST /collect/provision` | Create the tick schedule (SYSTEM) |
 | `GET/POST /delegate`, `DELETE /delegate/{id}` | The owner's delegates (owner-only) |
 | `GET /delegate/granted` | Owners who granted the caller access; then use `?onBehalfOf=<ownerId>` |
-| `GET/PUT /profile` | The owner's timezone (email and digest settings in phase 4) |
+| `GET/PUT /profile` | The owner's timezone, which decides the owner's local today for progress |
 
 ### 11.2 UI screens
 - **Today:** what's due now, with one-tap boolean, scale and choice entry. This is the daily-use
@@ -525,8 +493,8 @@ tests in its PR environment.
 - 2a. Profile; the daily tick; the frequency engine; the `prompt` source; PendingAsk; event
   subscriptions; missed handling.
 - 2b. A PR to `prompt` for the numeric answer type, and goals uses it.
-- Removed in 0.11.0: asking in prompt gave every metric two places to be recorded. The profile, the
-  frequency engine and the daily tick stay; the tick now only measures (section 6.1).
+- Removed in 0.11.0: asking in prompt gave every metric two places to be recorded. The profile and
+  the frequency engine stay; the daily tick went with measured metrics in 0.12.0.
 
 **Phase 3: dropped.** Breakdown happens outside the app (section 11.3).
 - **Done when** "Get paying customers" has been broken down to steps with assistance.
@@ -539,12 +507,10 @@ Revised 2026-10-24. A week after 5a-1 shipped, nothing had been recorded for 7 d
 paying-customers metric still read nothing. Recording friction is the main risk to the app, so the
 ladder's lower rungs come first. The upper rungs wait for a step that needs them.
 - 5a. `measured`, and one place to record, in slices:
-  - 5a-1 (shipped in 0.10.0). The measurement catalog and the `http` source, collected by the tick.
-    Its one entry is billing's paying customers. **Done when** the paying-customers metric is moved
-    to the root goal (its current goal starts 2027-04-01, so the tick would skip it) and switched to
-    `billing.paying-customers` by its admin owner, and a tick logs `measured 1`.
+  - 5a-1 (shipped in 0.10.0, removed in 0.12.0). The measurement catalog and the `http` source,
+    collected by the tick. Removed because billing's payments could never match a real customer.
   - 5a-2 (0.11.0). Remove prompt collection, so every value is recorded in goals (Today and the goal
-    page) or measured. **Done when** the metrics that used prompt are `manual`, the
+    page). **Done when** the metrics that used prompt are `manual`, the
     `goals-question-answered` subscription is deleted, and everything due is recorded on Today for
     two weeks.
   - Later: the `aggregation` and `event` sources, each when a real metric needs it.
@@ -556,6 +522,17 @@ ladder's lower rungs come first. The upper rungs wait for a step that needs them
   - 5c. `automated`: unattended actions, failure fallback and automated-coverage reporting. Most
     current goals (weight, family, choosing an offer) can never be satisfied by the platform, so
     automated coverage would mostly measure this app's own goal.
+
+**Phase 6: honest progress** (0.12.0, from a review of three weeks of real use)
+- 6a. Missing data: unrecorded periods are unknown rather than No in adherence, streaks and segments;
+  sub-goals without data are left out of the rollup and counted; today is the owner's local date.
+- 6b. Required and recent rates, with stalled trends named instead of projected.
+- 6c. Pausing a metric (`enabled`), and a setup review with the owner: pause metrics that can't mean
+  anything yet, and fix targets and baselines that misstate progress.
+- Then a feature freeze for about three weeks, and a read-only checkpoint around 2026-11-29: which
+  metrics are still recorded, how catch-up happens, and whether the stalled-trend line changed
+  anything. The next slice (a week catch-up grid, per-period count targets, or an on-demand
+  reflection) is chosen from that evidence.
 
 **Later:**
 - Public and shared goals, with accountability partners.
@@ -587,7 +564,7 @@ Checked 2026-10-03 against the code and the live services:
 
 | Risk | Mitigation |
 |---|---|
-| The owner stops recording | One place to record (Today), one-tap entry for yes/no, scale and choice metrics, and `measured` sources wherever a metric can be read automatically |
+| The owner stops recording | One place to record (Today), one-tap entry for yes/no, scale and choice metrics, and scores that stay honest when periods are left unrecorded |
 | Misleading fits on sparse or noisy data | Minimum n, show r² and n, label correlation vs causation |
 | Automations misusing goals' identity | Code-defined catalog, approvals for outward or write actions, run limits, audit log |
 | The decomposition tree grows too deep | Concreteness check; warn past depth 4 |

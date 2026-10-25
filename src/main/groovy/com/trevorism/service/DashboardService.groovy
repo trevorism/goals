@@ -46,10 +46,14 @@ class DashboardService {
         TreeProgress tree = progressService.progress(ownerId, root.id)
         GoalProgress progress = tree.goals.find { it.goalId == root.id }
         MetricProgress headline = tree.metrics
-                .findAll { it.goalId == root.id && it.score != null && metricsById[it.metricId]?.measures == MetricMeasuresType.OUTCOME }
+                .findAll { it.goalId == root.id && it.score != null && isActiveOutcome(metricsById[it.metricId]) }
                 .min { it.score - it.expected }
         new DashboardGoal(goal: root, progress: progress, headlineMetric: headline ? metricsById[headline.metricId] : null,
                 headlineMetricProgress: headline)
+    }
+
+    private static boolean isActiveOutcome(GoalMetric metric) {
+        metric?.measures == MetricMeasuresType.OUTCOME && metric.enabled != false
     }
 
     private static List<NeedsYouItem> pastEndDate(List<Goal> goals, LocalDate today) {

@@ -32,6 +32,7 @@ const selectedGoal = computed(() => selected.value?.goal)
 const selectedMetrics = computed(() => selected.value?.metrics ?? [])
 const isTreeRoot = computed(() => selectedGoal.value?.id === tree.value?.goal.id)
 const progressMaps = computed(() => progressById(progress.value))
+const chartNow = computed(() => (progress.value?.today ? `${progress.value.today}T00:00:00Z` : progress.value?.asOf ?? null))
 const selectedProgress = computed(() => progressMaps.value.goals[selectedId.value] ?? null)
 const headlineExpected = computed(() => {
   const goalProgress = selectedProgress.value
@@ -185,6 +186,9 @@ onMounted(load)
                   />
                 </div>
                 <p v-else class="no-progress text-sm text-slate-500">Add a metric with a target, or a sub-goal, to measure progress.</p>
+                <p v-if="selectedProgress.subGoalsWithoutData" class="sub-goals-without-data text-xs text-slate-500">
+                  {{ selectedProgress.subGoalsWithoutData }} started sub-goal{{ selectedProgress.subGoalsWithoutData === 1 ? ' has' : 's have' }} no data yet and {{ selectedProgress.subGoalsWithoutData === 1 ? 'is' : 'are' }} left out.
+                </p>
                 <p v-if="headlineExpected != null" class="text-xs text-slate-500">The marker shows where the plan says you should be by now.</p>
               </div>
               <p v-if="selectedGoal.description" class="whitespace-pre-line">{{ selectedGoal.description }}</p>
@@ -248,7 +252,7 @@ onMounted(load)
             :metric="metric"
             :goal="selectedGoal"
             :metric-progress="progressMaps.metrics[metric.id] ?? null"
-            :now="progress?.asOf ?? null"
+            :now="chartNow"
             :segments="progressMaps.segments[metric.id] ?? []"
             :delegate-labels="delegateLabels"
             @changed="load"

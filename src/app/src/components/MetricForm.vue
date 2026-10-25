@@ -1,8 +1,7 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { measurementsApi } from '../api.js'
+import { computed, reactive, ref } from 'vue'
 import { buildMetricPayload, metricFormFrom, validateMetric } from '../forms.js'
-import { FrequencyType, MetricDirectionType, MetricMeasuresType, MetricSourceType, MetricType, metricTypeLabels } from '../types.js'
+import { FrequencyType, MetricDirectionType, MetricMeasuresType, MetricType, metricTypeLabels } from '../types.js'
 
 const props = defineProps({
   metric: { type: Object, default: null },
@@ -20,38 +19,6 @@ const measuresOptions = [
   { value: MetricMeasuresType.OUTCOME, text: 'Outcome — the result you want' },
   { value: MetricMeasuresType.EFFORT, text: 'Effort — the work toward it' }
 ]
-
-const measurements = ref([])
-
-const sourceOptions = computed(() => {
-  const options = [
-    { value: MetricSourceType.MANUAL, text: 'I enter it myself' }
-  ]
-  if (measurements.value.length || form.source === MetricSourceType.HTTP) {
-    options.push({ value: MetricSourceType.HTTP, text: 'Measured automatically' })
-  }
-  return options
-})
-
-const selectedMeasurement = computed(() => measurements.value.find((measurement) => measurement.id === form.measurementId))
-
-onMounted(() => {
-  Promise.resolve()
-    .then(() => measurementsApi.list())
-    .then((available) => {
-      measurements.value = available ?? []
-    })
-    .catch(() => {
-      measurements.value = []
-    })
-})
-
-watch(selectedMeasurement, (measurement) => {
-  if (measurement && !editing.value) {
-    form.type = measurement.metricType
-    form.unit = form.unit || measurement.unit || ''
-  }
-})
 
 const hasDirection = computed(() => form.type === MetricType.NUMERIC || form.type === MetricType.SCALE)
 
@@ -82,25 +49,15 @@ function submit() {
         :options="typeOptions"
         value-by="value"
         text-by="text"
-        :disabled="editing || form.source === 'http'"
+        :disabled="editing"
       />
     </div>
     <div class="flex flex-wrap gap-3">
       <va-select v-model="form.measures" label="Measures" :options="measuresOptions" value-by="value" text-by="text" />
       <va-select v-model="form.frequency" label="Frequency" :options="FrequencyType.ALL" />
-      <va-select v-model="form.source" class="metric-source" label="Collected by" :options="sourceOptions" value-by="value" text-by="text" />
+      <va-switch v-if="editing" v-model="form.enabled" class="metric-enabled" label="Active" />
     </div>
-    <div v-if="form.source === 'http'" class="measurement-settings flex flex-col gap-1">
-      <va-select
-        v-model="form.measurementId"
-        class="measurement-id"
-        label="Measure"
-        :options="measurements"
-        value-by="id"
-        text-by="label"
-      />
-      <span class="text-xs text-slate-500">{{ selectedMeasurement?.description ?? 'Goals reads this value' }} once per {{ form.frequency === 'daily' ? 'day' : form.frequency === 'weekly' ? 'week' : 'month' }} and records it here.</span>
-    </div>
+    <span v-if="editing && !form.enabled" class="paused-hint text-xs text-slate-500">Paused: hidden from Today and left out of progress until you turn it back on.</span>
 
     <div v-if="hasDirection" class="flex flex-wrap gap-3">
       <va-select v-model="form.direction" label="Direction" :options="MetricDirectionType.ALL" />

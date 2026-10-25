@@ -4,10 +4,14 @@ import com.trevorism.model.Choice
 import com.trevorism.model.Goal
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
+import com.trevorism.model.GoalProfile
 import com.trevorism.model.types.MetricSourceType
 import com.trevorism.model.types.MetricType
 import com.trevorism.support.TestStore
 import org.junit.jupiter.api.Test
+
+import java.time.Clock
+import java.time.ZoneOffset
 
 import static com.trevorism.service.GoalServiceTest.assertBadRequest
 import static com.trevorism.service.GoalServiceTest.assertNotFound
@@ -40,6 +44,15 @@ class ObservationServiceTest {
         assert store.metricRepository.get(OWNER, weight.id).lastObservedAt == observation.observedAt
         assertBadRequest { service.create(OWNER, weight.id, new GoalObservation()) }
         assertBadRequest { service.create(OWNER, weight.id, new GoalObservation(value: 1, metricSource: "rumor")) }
+    }
+
+    @Test
+    void testAnUndatedObservationIsDatedTheOwnersLocalDay() {
+        store.profileService().update(OWNER, new GoalProfile(timezone: "America/Denver"))
+        service.clock = Clock.fixed(day(41).toInstant().plusSeconds(5 * 3600), ZoneOffset.UTC)
+        GoalMetric weight = metric(type: MetricType.NUMERIC)
+
+        assert service.create(OWNER, weight.id, new GoalObservation(value: 201.5)).observedAt == day(40)
     }
 
     @Test
