@@ -63,6 +63,18 @@ describe('GoalDetail', () => {
     expect(axios.get).toHaveBeenCalledWith('/api/goal/cardio/adjustment')
   })
 
+  it('greys out a paused metric', async () => {
+    const paused = { ...walked, id: 'm2', name: 'Fees earned', type: 'numeric', enabled: false }
+    axios.get.mockImplementation((url) => {
+      if (url === '/api/goal/root/tree') return Promise.resolve({ data: { ...tree, metrics: [paused] } })
+      return Promise.resolve({ data: [] })
+    })
+    const wrapper = await mountDetail()
+
+    expect(wrapper.find('.metric-card').classes()).toContain('paused')
+    expect(wrapper.find('.paused-label').text()).toBe('· paused')
+  })
+
   it('marks the selected goal completed and reloads', async () => {
     axios.put.mockResolvedValue({ data: {} })
     const wrapper = await mountDetail()
@@ -141,10 +153,10 @@ describe('GoalDetail', () => {
           data: {
             asOf: '2027-01-15T00:00:00Z',
             goals: [
-              { goalId: 'root', progress: 0.4, outcomeProgress: null, effortProgress: 0.4, expected: 0.3, pace: -0.1, status: 'behind' },
+              { goalId: 'root', progress: 0.4, outcomeProgress: null, effortProgress: 0.4, expected: 0.3, pace: -0.1, status: 'behind', subGoalsWithoutData: 2 },
               { goalId: 'cardio', progress: 0.9, outcomeProgress: 0.9, effortProgress: null, expected: 0.95, pace: -0.05, status: 'on_track' }
             ],
-            metrics: [{ metricId: 'm1', score: 0.9, status: 'on_track', adherence: 0.72, currentStreak: 2, bestStreak: 6 }]
+            metrics: [{ metricId: 'm1', score: 0.9, status: 'on_track', adherence: 0.72, answeredPeriods: 25, windowPeriods: 28, currentStreak: 2, bestStreak: 6 }]
           }
         })
       }
@@ -158,13 +170,15 @@ describe('GoalDetail', () => {
     expect(wrapper.find('.effort-meter .meter-value').text()).toBe('40%')
     expect(wrapper.find('.effort-meter .meter-marker').attributes('style')).toContain('left: 50%')
     expect(wrapper.findAll('.tree-progress').map((row) => row.text())).toEqual(['40%▼Behind', '90%✓On track'])
+    expect(wrapper.find('.sub-goals-without-data').text()).toBe('2 started sub-goals have no data yet and are left out.')
 
     await wrapper.findAll('.tree-row')[1].trigger('click')
     await flushPromises()
 
     expect(wrapper.find('.outcome-meter .meter-value').text()).toBe('90%')
+    expect(wrapper.find('.sub-goals-without-data').exists()).toBe(false)
     expect(wrapper.find('.metric-score').text()).toBe('90% of target')
-    expect(wrapper.findAll('.metric-fact').map((fact) => fact.text())).toEqual(['· 72% yes, last 4 weeks', '· streak 2 (best 6)'])
+    expect(wrapper.findAll('.metric-fact').map((fact) => fact.text())).toEqual(['· 72% yes on 25 of 28 days recorded', '· streak 2 (best 6)'])
   })
 
   it('still shows the goal when progress fails to load', async () => {

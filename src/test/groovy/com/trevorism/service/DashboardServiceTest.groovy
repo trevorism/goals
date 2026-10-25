@@ -25,7 +25,7 @@ import static com.trevorism.support.TestStore.rootGoal
 class DashboardServiceTest {
 
     private final TestStore store = new TestStore()
-    private final ProgressService progressService = new ProgressService(store.goalRepository, store.metricRepository, store.observationRepository, store.adjustmentRepository)
+    private final ProgressService progressService = new ProgressService(store.goalRepository, store.metricRepository, store.observationRepository, store.adjustmentRepository, store.profileService())
     private final DashboardService service = new DashboardService(store.goalRepository, store.metricRepository, progressService)
     private final Goal health = store.goalService().createRoot(OWNER, rootGoal())
 

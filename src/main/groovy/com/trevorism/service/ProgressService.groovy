@@ -9,6 +9,7 @@ import jakarta.inject.Named
 import jakarta.inject.Singleton
 
 import java.time.Clock
+import java.time.LocalDate
 
 @Singleton
 class ProgressService {
@@ -17,16 +18,19 @@ class ProgressService {
     private final OwnedRepository<GoalMetric> metricRepository
     private final OwnedRepository<GoalObservation> observationRepository
     private final OwnedRepository<GoalAdjustment> adjustmentRepository
+    private final ProfileService profileService
     Clock clock = Clock.systemUTC()
 
     ProgressService(@Named("goal") OwnedRepository<Goal> goalRepository,
                     @Named("metric") OwnedRepository<GoalMetric> metricRepository,
                     @Named("observation") OwnedRepository<GoalObservation> observationRepository,
-                    @Named("adjustment") OwnedRepository<GoalAdjustment> adjustmentRepository) {
+                    @Named("adjustment") OwnedRepository<GoalAdjustment> adjustmentRepository,
+                    ProfileService profileService) {
         this.goalRepository = goalRepository
         this.metricRepository = metricRepository
         this.observationRepository = observationRepository
         this.adjustmentRepository = adjustmentRepository
+        this.profileService = profileService
     }
 
     TreeProgress progress(String ownerId, String id) {
@@ -44,7 +48,8 @@ class ProgressService {
         Set<String> treeIds = wholeTree*.id as Set
         List<GoalAdjustment> adjustments = adjustmentRepository.list(ownerId).findAll { it.goalId in treeIds }
         Map<String, List<GoalAdjustment>> adjustmentsByMetric = AdjustmentScope.byMetric(metrics, adjustments, wholeTree)
-        new ProgressCalculator(Date.from(clock.instant())).calculate(top, subtree, metrics, observations, adjustmentsByMetric)
+        LocalDate ownersToday = LocalDate.now(clock.withZone(profileService.zoneFor(ownerId)))
+        new ProgressCalculator(Date.from(clock.instant()), ownersToday).calculate(top, subtree, metrics, observations, adjustmentsByMetric)
     }
 
     private static List<Goal> descendants(Goal top, List<Goal> treeGoals) {

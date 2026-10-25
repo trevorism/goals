@@ -6,8 +6,6 @@ import { button, labelled, stubs } from './stubs.js'
 
 vi.mock('axios', () => ({ default: { get: vi.fn() } }))
 
-const payingCustomers = { id: 'billing.paying-customers', label: 'Paying customers (billing)', description: 'Distinct paying customers', metricType: 'numeric', unit: 'customers' }
-
 function mountForm(props = {}) {
   return mount(MetricForm, { props, global: { stubs } })
 }
@@ -65,49 +63,17 @@ describe('MetricForm', () => {
     expect(wrapper.find('.form-error').text()).toBe('Enter a name')
   })
 
-  it('offers measured collection only when a measurement is available', async () => {
-    const plain = mountForm()
-    await flushPromises()
+  it('pauses and resumes a metric only when editing', async () => {
+    expect(mountForm().find('.metric-enabled').exists()).toBe(false)
 
-    expect(selectNamed(plain, 'Collected by').props('options').map((option) => option.value)).toEqual(['manual'])
-    expect(axios.get).toHaveBeenCalledWith('/api/measurement')
+    const wrapper = mountForm({ metric: { id: 'm', name: 'Fees earned', type: 'numeric', enabled: true } })
+    expect(wrapper.find('.paused-hint').exists()).toBe(false)
 
-    axios.get.mockResolvedValue({ data: [payingCustomers] })
-    const offered = mountForm()
-    await flushPromises()
-
-    expect(selectNamed(offered, 'Collected by').props('options').map((option) => option.value)).toEqual(['manual', 'http'])
-  })
-
-  it('emits the chosen measurement and takes its type and unit', async () => {
-    axios.get.mockResolvedValue({ data: [payingCustomers] })
-    const wrapper = mountForm()
-    await flushPromises()
-
-    await labelled(wrapper, '.va-input', 'Name').setValue('Paying customers')
-    selectNamed(wrapper, 'Type').vm.$emit('update:modelValue', 'scale')
-    selectNamed(wrapper, 'Collected by').vm.$emit('update:modelValue', 'http')
-    await flushPromises()
-    await button(wrapper, 'Add metric').trigger('click')
-    expect(wrapper.find('.form-error').text()).toBe('Choose what to measure')
-
-    selectNamed(wrapper, 'Measure').vm.$emit('update:modelValue', 'billing.paying-customers')
-    await flushPromises()
-    expect(wrapper.find('.measurement-settings').text()).toContain('Distinct paying customers once per day')
-    expect(wrapper.find('.metric-type').attributes('data-disabled')).toBe('true')
-    await button(wrapper, 'Add metric').trigger('click')
-
-    expect(wrapper.emitted('save')[0][0]).toMatchObject({ source: 'http', measurementId: 'billing.paying-customers', type: 'numeric', unit: 'customers' })
-  })
-
-  it('keeps a measured metric editable when its measurement is not offered', async () => {
-    const wrapper = mountForm({ metric: { id: 'm', name: 'Paying customers', type: 'numeric', source: 'http', measurementId: 'billing.paying-customers' } })
-    await flushPromises()
-
-    expect(selectNamed(wrapper, 'Collected by').props('options').map((option) => option.value)).toContain('http')
+    await wrapper.find('.metric-enabled').setValue(false)
+    expect(wrapper.find('.paused-hint').text()).toContain('Paused')
     await button(wrapper, 'Save metric').trigger('click')
 
-    expect(wrapper.emitted('save')[0][0]).toMatchObject({ source: 'http', measurementId: 'billing.paying-customers' })
+    expect(wrapper.emitted('save')[0][0]).toMatchObject({ enabled: false })
   })
 })
 

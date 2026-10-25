@@ -157,14 +157,40 @@ class ProgressCalculatorTest {
     }
 
     @Test
-    void testUnansweredDaysCountAsNoButAnUnansweredTodayDoesNot() {
+    void testUnrecordedDaysAreLeftOutOfAdherenceAndReportedAsCoverage() {
         GoalMetric walked = metric(type: MetricType.BOOLEAN)
 
-        MetricProgress result = progressOf(walked, answers([44: true, 46: true, 49: true]))
+        MetricProgress result = progressOf(walked, answers([44: true, 46: false, 49: true]))
 
-        assert near(result.adherence, 3 / 6d)
+        assert near(result.adherence, 2 / 3d)
+        assert result.answeredPeriods == 3
+        assert result.windowPeriods == 6
         assert result.currentStreak == 1
         assert result.bestStreak == 1
+    }
+
+    @Test
+    void testMissedAnswersCountAsUnrecordedRatherThanNo() {
+        GoalMetric walked = metric(type: MetricType.BOOLEAN)
+        List<GoalObservation> observations = answers([47: true, 49: true]) + [new GoalObservation(observedAt: day(48), missed: true)]
+
+        MetricProgress result = progressOf(walked, observations)
+
+        assert near(result.adherence, 1)
+        assert result.answeredPeriods == 2
+        assert result.observationCount == 2
+    }
+
+    @Test
+    void testAnswersOlderThanTheWindowLeaveAdherenceWithoutData() {
+        GoalMetric walked = metric(type: MetricType.BOOLEAN)
+
+        MetricProgress result = progressOf(walked, answers([5: true, 6: true]))
+
+        assert result.adherence == null
+        assert result.score == null
+        assert result.answeredPeriods == 0
+        assert result.status == ProgressStatusType.NO_DATA
     }
 
     @Test
@@ -175,7 +201,16 @@ class ProgressCalculatorTest {
 
         assert result.currentStreak == 4
         assert result.bestStreak == 4
-        assert progressOf(walked, answers([40: true, 41: true, 42: true, 48: true, 49: true])).currentStreak == 2
+    }
+
+    @Test
+    void testUnrecordedDaysDoNotBreakAStreak() {
+        GoalMetric walked = metric(type: MetricType.BOOLEAN)
+
+        MetricProgress result = progressOf(walked, answers([40: true, 41: true, 42: true, 48: true, 49: true]))
+
+        assert result.currentStreak == 5
+        assert result.bestStreak == 5
     }
 
     @Test
@@ -242,7 +277,8 @@ class ProgressCalculatorTest {
         assert near(byId.root.outcomeProgress, 0.5)
         assert near(byId.root.progress, 0.5)
         assert byId.root.status == ProgressStatusType.ON_TRACK
-        assert near(byId.root.effortProgress, 0.5)
+        assert near(byId.root.effortProgress, 1)
+        assert byId.root.subGoalsWithoutData == 1
         assert near(byId.done.progress, 1)
         assert byId.idle.progress == null
         assert byId.idle.status == ProgressStatusType.NO_DATA
@@ -269,15 +305,79 @@ class ProgressCalculatorTest {
     }
 
     @Test
-    void testAnUnmeasuredSubGoalPullsItsParentBehindAsTimePasses() {
+    void testSubGoalsWithoutDataAreLeftOutAndOnlyStartedOnesAreCounted() {
         Goal root = goal("root")
+        Goal later = new Goal(id: "later", parentId: "root", title: "later", status: GoalStatusType.ACTIVE, startDate: day(60), endDate: day(90))
 
-        TreeProgress tree = calculator.calculate(root, [root, goal("step", "root")], [], [:])
+        TreeProgress tree = calculator.calculate(root, [root, goal("step", "root"), later], [], [:])
         GoalProgress rootProgress = tree.goals.find { it.goalId == "root" }
 
-        assert near(rootProgress.progress, 0)
-        assert near(rootProgress.pace, -0.5)
-        assert rootProgress.status == ProgressStatusType.BEHIND
+        assert rootProgress.progress == null
+        assert rootProgress.pace == null
+        assert rootProgress.status == ProgressStatusType.NO_DATA
+        assert rootProgress.subGoalsWithoutData == 1
+    }
+
+    @Test
+    void testAPausedMetricIsShownButLeftOutOfItsGoalsProgress() {
+        Goal root = goal("root")
+        GoalMetric weight = metric(id: "weight", goalId: "root", type: MetricType.NUMERIC, baseline: 200d, target: 180d, direction: MetricDirectionType.DECREASE)
+        GoalMetric fees = metric(id: "fees", goalId: "root", type: MetricType.NUMERIC, baseline: 0d, target: 100d, enabled: false)
+
+        TreeProgress tree = calculator.calculate(root, [root], [weight, fees], [weight: values([0: 200d, 25: 195d, 50: 190d]), fees: values([50: 0d])])
+
+        assert near(tree.goals[0].outcomeProgress, 0.5)
+        assert near(tree.metrics.find { it.metricId == "fees" }.score, 0)
+    }
+
+    @Test
+    void testATrendReportsTheRequiredRateAndTheRecentRate() {
+        GoalMetric weight = metric(type: MetricType.NUMERIC, baseline: 215d, target: 200d, direction: MetricDirectionType.DECREASE)
+        List<GoalObservation> observations = values([0: 215d, 10: 214d, 20: 213d, 36: 213d, 40: 213d, 44: 213d, 47: 213d, 50: 213d])
+
+        MetricProgress result = progressOf(weight, observations)
+
+        assert near(result.requiredRate, -13d / (50d / 7d))
+        assert near(result.recentRate, 0)
+        assert result.stalled
+    }
+
+    @Test
+    void testATrendOnPaceIsNotStalled() {
+        GoalMetric weight = metric(type: MetricType.NUMERIC, baseline: 200d, target: 180d, direction: MetricDirectionType.DECREASE)
+        List<GoalObservation> observations = values((0..10).collectEntries { [it * 5, 200d - it * 2d] })
+
+        MetricProgress result = progressOf(weight, observations)
+
+        assert near(result.recentRate, -2.8)
+        assert result.requiredRate < 0
+        assert !result.stalled
+    }
+
+    @Test
+    void testRatesNeedEnoughValuesAndAnOpenTarget() {
+        GoalMetric weight = metric(type: MetricType.NUMERIC, baseline: 200d, target: 180d, direction: MetricDirectionType.DECREASE)
+
+        MetricProgress sparse = progressOf(weight, values([40: 195d, 50: 194d]))
+        MetricProgress reached = progressOf(weight, values([30: 185d, 35: 182d, 40: 180d, 45: 179d, 50: 178d]))
+
+        assert sparse.recentRate == null
+        assert sparse.stalled == null
+        assert sparse.requiredRate != null
+        assert reached.requiredRate == null
+        assert reached.stalled == null
+    }
+
+    @Test
+    void testTheOwnersLocalDayDecidesWhatCountsAsToday() {
+        GoalMetric walked = metric(type: MetricType.BOOLEAN)
+        ProgressCalculator eveningInNewYork = new ProgressCalculator(NOW, START.plusDays(49))
+
+        MetricProgress result = eveningInNewYork.metricProgress(walked, goal("g"), answers([48: true, 50: true]))
+
+        assert result.answeredPeriods == 1
+        assert result.windowPeriods == 1
+        assert result.observationCount == 1
     }
 
     @Test

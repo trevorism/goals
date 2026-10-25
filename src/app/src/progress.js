@@ -162,7 +162,7 @@ export function rollingAdherence(metric, goal, observations, now) {
   const sorted = [...observations]
     .filter((observation) => observation.observedAt && time(observation.observedAt) <= time(now))
     .sort((a, b) => time(a.observedAt) - time(b.observedAt) || time(a.createdDate ?? 0) - time(b.createdDate ?? 0))
-  sorted.forEach((observation) => answers.set(periodOf(observation.observedAt, frequency), !observation.missed && observation.value === 1))
+  sorted.filter((observation) => !observation.missed).forEach((observation) => answers.set(periodOf(observation.observedAt, frequency), observation.value === 1))
   if (!answers.size) {
     return []
   }
@@ -176,13 +176,14 @@ export function rollingAdherence(metric, goal, observations, now) {
       break
     }
     const windowStart = Math.max(previousPeriods(period, windowLength - 1, frequency), trackingFloor)
-    let periods = 0
+    let answered = 0
     let yes = 0
     for (let inWindow = windowStart; inWindow <= period; inWindow = nextPeriod(inWindow, frequency)) {
-      periods++
+      if (!answers.has(inWindow)) continue
+      answered++
       if (answers.get(inWindow)) yes++
     }
-    series.push({ x: period, y: periods ? (yes / periods) * 100 : 0 })
+    if (answered) series.push({ x: period, y: (yes / answered) * 100 })
   }
   return series
 }
@@ -257,6 +258,18 @@ function planTarget(metric) {
 }
 
 const withUnit = (metric, value) => (metric.unit ? `${formatNumber(value)} ${metric.unit}` : formatNumber(value))
+
+const withRate = (metric, perWeek) => `${signed(perWeek)}${metric.unit ? ` ${metric.unit}` : ''}/wk`
+
+const PARTIAL_COVERAGE = 0.5
+
+function describeAdherence(metric, metricProgress) {
+  const { answeredPeriods, windowPeriods } = metricProgress
+  const share = `${formatPercent(metricProgress.adherence)} yes`
+  if (!windowPeriods) return share
+  const partial = answeredPeriods / windowPeriods < PARTIAL_COVERAGE ? ' (partial data)' : ''
+  return `${share} on ${answeredPeriods} of ${windowPeriods} ${periodName(metric.frequency)} recorded${partial}`
+}
 
 export function formatNumber(value) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
@@ -381,11 +394,14 @@ export function describeHeadline(row) {
   const metricProgress = row.headlineMetricProgress
   if (!metric || !metricProgress) {
     const effort = row.progress?.effortProgress
-    return effort !== null && effort !== undefined ? `${formatPercent(effort)} of sub-goals and habits on track` : 'Add a metric with a target to track this goal'
+    return effort !== null && effort !== undefined ? `Effort ${formatPercent(effort)} across sub-goals and habits` : 'Add a metric with a target to track this goal'
   }
   if (metric.type === MetricType.BOOLEAN && metricProgress.adherence !== null && metricProgress.adherence !== undefined) {
     const target = metric.target !== null && metric.target !== undefined ? ` (target ${formatPercent(metric.target)})` : ''
-    return `${metric.name}: ${formatPercent(metricProgress.adherence)} yes${target}`
+    return `${metric.name}: ${formatPercent(metricProgress.adherence)} yes on recorded days${target}`
+  }
+  if (metricProgress.stalled) {
+    return `${metric.name}: needs ${withRate(metric, metricProgress.requiredRate)} to reach ${withUnit(metric, metric.target)} by ${formatDay(row.goal.endDate)}, last 2 weeks ${withRate(metric, metricProgress.recentRate)}`
   }
   if (metricProgress.projectedEnd !== null && metricProgress.projectedEnd !== undefined) {
     const target = metric.target !== null && metric.target !== undefined ? ` (target ${withUnit(metric, metric.target)})` : ''
@@ -409,11 +425,17 @@ export function describeMetricProgress(metric, metricProgress) {
   }
   const facts = []
   if (metric.type === MetricType.BOOLEAN) {
-    if (metricProgress.adherence !== null) facts.push(`${formatPercent(metricProgress.adherence)} yes, last 4 ${metric.frequency === 'monthly' ? 'months' : 'weeks'}`)
+    if (metricProgress.adherence !== null && metricProgress.adherence !== undefined) facts.push(describeAdherence(metric, metricProgress))
     if (metricProgress.currentStreak) facts.push(`streak ${metricProgress.currentStreak} (best ${metricProgress.bestStreak})`)
     return facts
   }
-  if (metricProgress.projectedEnd !== null && metricProgress.projectedEnd !== undefined) {
+  if (metricProgress.requiredRate !== null && metricProgress.requiredRate !== undefined) {
+    facts.push(`needs ${withRate(metric, metricProgress.requiredRate)}`)
+  }
+  if (metricProgress.recentRate !== null && metricProgress.recentRate !== undefined) {
+    facts.push(`last 2 weeks ${withRate(metric, metricProgress.recentRate)}`)
+  }
+  if (metricProgress.projectedEnd !== null && metricProgress.projectedEnd !== undefined && !metricProgress.stalled) {
     facts.push(`on this trend, ${withUnit(metric, metricProgress.projectedEnd)} by the end`)
   }
   if (metricProgress.projectedTargetDate) {

@@ -1,3 +1,13 @@
+## 0.12.0
+
+- Unrecorded days no longer count as No. Yes/no adherence is the share of Yes over the days you recorded, shown as "31% yes on 13 of 22 days recorded", with "(partial data)" when fewer than half are recorded. Streaks skip unrecorded days, and adjustment comparisons count only recorded days.
+- Sub-goals without data are left out of their parent's progress instead of counting as 0%. The goal page says how many started sub-goals have no data yet; sub-goals that haven't started aren't counted.
+- "Today" for progress is your local day, from your profile timezone, so this evening's unrecorded habits don't count against you after midnight UTC.
+- Numeric and scale metrics show the rate needed to reach the target and the rate over the last two weeks ("needs −1.3 lb/wk · last 2 weeks 0.0 lb/wk"). When the recent trend has stalled, the card and the dashboard name the required rate instead of the all-data projection.
+- Metrics can be paused with the new Active switch: a paused metric leaves Today and its goal's progress, and its card is greyed out.
+- Measured metrics are removed: the billing paying-customers measurement, `GET /api/measurement`, the daily tick and `POST /api/collect/*`. Every value is recorded in goals.
+- The dashboard's effort headline now reads "Effort 40% across sub-goals and habits".
+
 ## 0.11.0
 
 - Goals no longer asks questions in prompt. Every value is recorded in goals, on the Today page or the goal page, or measured automatically, so there is one place to record each metric.

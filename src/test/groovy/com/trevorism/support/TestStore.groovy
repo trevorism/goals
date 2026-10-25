@@ -8,7 +8,6 @@ import com.trevorism.model.GoalObservation
 import com.trevorism.model.GoalProfile
 import com.trevorism.service.AdjustmentService
 import com.trevorism.service.GoalService
-import com.trevorism.service.MeasurementCatalog
 import com.trevorism.service.MetricService
 import com.trevorism.service.ObservationService
 import com.trevorism.service.OwnedRepository
@@ -38,7 +37,7 @@ class TestStore {
     }
 
     MetricService metricService() {
-        new MetricService(goalRepository, metricRepository, observationRepository, new MeasurementCatalog())
+        new MetricService(goalRepository, metricRepository, observationRepository)
     }
 
     ObservationService observationService() {

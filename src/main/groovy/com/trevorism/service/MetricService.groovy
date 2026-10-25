@@ -3,7 +3,6 @@ package com.trevorism.service
 import com.trevorism.model.Goal
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
-import com.trevorism.model.measurement.Measurement
 import com.trevorism.model.types.FrequencyType
 import com.trevorism.model.types.MetricDirectionType
 import com.trevorism.model.types.MetricMeasuresType
@@ -21,16 +20,13 @@ class MetricService {
     private final OwnedRepository<Goal> goalRepository
     private final OwnedRepository<GoalMetric> metricRepository
     private final OwnedRepository<GoalObservation> observationRepository
-    private final MeasurementCatalog measurementCatalog
 
     MetricService(@Named("goal") OwnedRepository<Goal> goalRepository,
                   @Named("metric") OwnedRepository<GoalMetric> metricRepository,
-                  @Named("observation") OwnedRepository<GoalObservation> observationRepository,
-                  MeasurementCatalog measurementCatalog) {
+                  @Named("observation") OwnedRepository<GoalObservation> observationRepository) {
         this.goalRepository = goalRepository
         this.metricRepository = metricRepository
         this.observationRepository = observationRepository
-        this.measurementCatalog = measurementCatalog
     }
 
     List<GoalMetric> listForGoal(String ownerId, String goalId) {
@@ -42,7 +38,7 @@ class MetricService {
         metricRepository.get(ownerId, id)
     }
 
-    GoalMetric create(String ownerId, String goalId, GoalMetric metric, Collection<String> measurementRoles = []) {
+    GoalMetric create(String ownerId, String goalId, GoalMetric metric) {
         Goal goal = goalRepository.get(ownerId, goalId)
         metric.goalId = goal.id
         metric.rootId = goal.treeRootId()
@@ -57,11 +53,10 @@ class MetricService {
         metric.lastObservedAt = null
         metric.createdDate = new Date()
         validate(metric)
-        validateMeasurement(metric, true, measurementRoles)
         metricRepository.create(ownerId, metric)
     }
 
-    GoalMetric update(String ownerId, String id, GoalMetric changes, Collection<String> measurementRoles = []) {
+    GoalMetric update(String ownerId, String id, GoalMetric changes) {
         GoalMetric existing = metricRepository.get(ownerId, id)
         require(changes.type == null || changes.type == existing.type, "a metric's type cannot change")
         existing.name = changes.name ?: existing.name
@@ -76,15 +71,10 @@ class MetricService {
         existing.scaleMax = changes.scaleMax != null ? changes.scaleMax : existing.scaleMax
         existing.choices = changes.choices ?: existing.choices
         existing.frequency = changes.frequency ?: existing.frequency
-        String previousSource = existing.source
-        String previousMeasurementId = existing.measurementId
         existing.source = changes.source ?: existing.source
-        existing.measurementId = changes.measurementId ?: existing.measurementId
         existing.enabled = changes.enabled != null ? changes.enabled : existing.enabled
         existing.choices = choicesFor(existing)
         validate(existing)
-        boolean measurementChanged = existing.source != previousSource || existing.measurementId != previousMeasurementId
-        validateMeasurement(existing, measurementChanged, measurementRoles)
         metricRepository.update(ownerId, id, existing)
     }
 
@@ -92,19 +82,6 @@ class MetricService {
         GoalMetric metric = metricRepository.get(ownerId, id)
         observationRepository.listWhere(ownerId, "metricId", metric.id).each { observationRepository.delete(ownerId, it.id) }
         metricRepository.delete(ownerId, id)
-    }
-
-    private void validateMeasurement(GoalMetric metric, boolean checkAccess, Collection<String> measurementRoles) {
-        if (metric.source != MetricSourceType.HTTP) {
-            metric.measurementId = metric.measurementId ? "" : null
-            return
-        }
-        Measurement measurement = measurementCatalog.find(metric.measurementId)
-        require(measurement != null, "a measured metric requires a measurementId from the catalog")
-        require(metric.type == measurement.metricType, "${measurement.label} is measured as ${measurement.metricType}, so the metric must be ${measurement.metricType}")
-        if (checkAccess) {
-            require(MeasurementCatalog.isAllowed(measurement, measurementRoles), "You can't use the ${measurement.label} measurement")
-        }
     }
 
     private static List choicesFor(GoalMetric metric) {

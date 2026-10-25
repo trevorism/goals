@@ -31,13 +31,21 @@ class ProgressCalculator {
     static final double DAY_MILLIS = 86_400_000d
     static final double PROJECTION_HORIZON_MULTIPLE = 2d
     static final int MINIMUM_SEGMENT_POINTS = 5
+    static final int RECENT_DAYS = 14
+    static final int MINIMUM_RECENT_POINTS = 5
+    static final double STALLED_SHARE_OF_REQUIRED_RATE = 0.25
+    static final double DAYS_PER_WEEK = 7d
 
     private final Date now
     private final LocalDate today
 
     ProgressCalculator(Date now) {
+        this(now, toLocalDate(now))
+    }
+
+    ProgressCalculator(Date now, LocalDate today) {
         this.now = now
-        this.today = toLocalDate(now)
+        this.today = today
     }
 
     TreeProgress calculate(Goal top, List<Goal> subtree, List<GoalMetric> metrics, Map<String, List<GoalObservation>> observationsByMetric,
@@ -67,13 +75,17 @@ class ProgressCalculator {
 
         List<Contribution> outcomeItems = outcome.collect { new Contribution(it.score, it.score - it.expected, it.status) }
         List<Contribution> effortItems = effort.collect { new Contribution(it.score, it.score - it.expected, it.status) }
+        int subGoalsWithoutData = 0
         (childrenByParent[goal.id] ?: []).each { Goal child ->
             GoalProgress childResult = goalProgress(child, childrenByParent, metricsByGoal, metricResults, results)
-            if (child.status != GoalStatusType.ABANDONED) {
-                double childProgress = childResult.progress ?: 0d
-                double childPace = childResult.pace != null ? childResult.pace : childProgress - childResult.expected
-                effortItems << new Contribution(childProgress, childPace, childResult.status)
+            if (child.status == GoalStatusType.ABANDONED) {
+                return
             }
+            if (childResult.progress == null) {
+                subGoalsWithoutData += hasStarted(child) ? 1 : 0
+                return
+            }
+            effortItems << new Contribution(childResult.progress, childResult.pace, childResult.status)
         }
 
         double expected = elapsedFraction(goal)
@@ -91,18 +103,17 @@ class ProgressCalculator {
 
         GoalProgress result = new GoalProgress(goalId: goal.id, parentId: goal.parentId, progress: progress,
                 outcomeProgress: mean(outcomeItems*.progress), effortProgress: mean(effortItems*.progress),
-                expected: expected, pace: pace, status: status)
+                expected: expected, pace: pace, status: status, subGoalsWithoutData: subGoalsWithoutData)
         results[goal.id] = result
         return result
     }
 
     private static List<MetricProgress> scored(List<GoalMetric> metrics, String measures, Map<String, MetricProgress> metricResults) {
-        metrics.findAll { it.measures == measures }.collect { metricResults[it.id] }.findAll { it?.score != null }
+        metrics.findAll { it.measures == measures && it.enabled != false }.collect { metricResults[it.id] }.findAll { it?.score != null }
     }
 
     MetricProgress metricProgress(GoalMetric metric, Goal goal, List<GoalObservation> allObservations) {
-        List<GoalObservation> observations = allObservations.findAll { it.observedAt != null && !it.observedAt.after(now) }
-                .sort { a, b -> a.observedAt <=> b.observedAt ?: a.createdDate <=> b.createdDate }
+        List<GoalObservation> observations = recordedByToday(allObservations)
         MetricProgress result = new MetricProgress(metricId: metric.id, goalId: metric.goalId,
                 observationCount: observations.count { !it.missed } as Integer)
         switch (metric.type) {
@@ -162,6 +173,29 @@ class ProgressCalculator {
             result.projectedProgress = fractionToward(result.projectedEnd, baseline, target, metric.direction)
             result.projectedTargetDate = projectedTargetDate(goal, fit, result.current, target, metric.direction, endX)
         }
+        measureRates(goal, points, target, metric.direction, result)
+    }
+
+    private void measureRates(Goal goal, List<double[]> points, double target, String direction, MetricProgress result) {
+        double latest = points.last()[1]
+        double weeksLeft = (goal.endDate.time - now.time) / (DAYS_PER_WEEK * DAY_MILLIS)
+        if (weeksLeft > 0 && !reached(latest, target, direction)) {
+            result.requiredRate = (target - latest) / weeksLeft
+        }
+        List<double[]> recent = recentPoints(goal, points)
+        if (recent.size() >= MINIMUM_RECENT_POINTS) {
+            result.recentRate = LinearFit.of(recent).slope * DAYS_PER_WEEK
+        }
+        if (result.requiredRate != null && result.recentRate != null) {
+            double recentTowardTarget = result.recentRate * Math.signum(result.requiredRate)
+            result.stalled = recentTowardTarget < STALLED_SHARE_OF_REQUIRED_RATE * Math.abs(result.requiredRate)
+        }
+    }
+
+    private List<double[]> recentPoints(Goal goal, List<double[]> points) {
+        double recentStart = daysFromStart(goal, now) - RECENT_DAYS
+        List<double[]> withinRecentDays = points.findAll { it[0] >= recentStart }
+        withinRecentDays.size() >= MINIMUM_RECENT_POINTS ? withinRecentDays : points.takeRight(MINIMUM_RECENT_POINTS)
     }
 
     private Date projectedTargetDate(Goal goal, LinearFit fit, double current, double target, String direction, double endX) {
@@ -207,33 +241,33 @@ class ProgressCalculator {
     }
 
     private void measureAdherence(GoalMetric metric, Goal goal, List<GoalObservation> observations, MetricProgress result) {
-        if (!observations) {
-            return
-        }
         String frequency = metric.frequency ?: FrequencyType.DAILY
         Map<LocalDate, Boolean> answers = answersByPeriod(observations, frequency)
-
+        if (!answers) {
+            return
+        }
         LocalDate current = periodOf(today, frequency)
-        LocalDate firstAnswered = answers.keySet().min()
         LocalDate windowStart = current.minus(windowPeriods(frequency) - 1, unitOf(frequency))
-        LocalDate trackingStart = [windowStart, firstAnswered, periodOf(toLocalDate(goal.startDate), frequency)].max()
+        LocalDate trackingStart = [windowStart, answers.keySet().min(), periodOf(toLocalDate(goal.startDate), frequency)].max()
 
         List<LocalDate> window = periodsBetween(trackingStart, current, frequency).findAll { it != current || answers.containsKey(current) }
-        if (window) {
-            result.adherence = window.count { answers[it] } / (double) window.size()
+        List<LocalDate> answered = window.findAll { answers.containsKey(it) }
+        result.windowPeriods = window.size()
+        result.answeredPeriods = answered.size()
+        if (answered) {
+            result.adherence = answered.count { answers[it] } / (double) answered.size()
             result.score = metric.target != null ? Math.min(result.adherence / metric.target, 1d) : result.adherence
         }
         result.current = result.adherence
 
-        List<LocalDate> history = periodsBetween(firstAnswered, current, frequency)
+        List<Boolean> answersInOrder = answers.findAll { !it.key.isAfter(current) }.sort { it.key }.values().toList()
         int best = 0
         int run = 0
-        history.each { LocalDate period ->
-            run = answers[period] ? run + 1 : 0
+        answersInOrder.each { boolean yes ->
+            run = yes ? run + 1 : 0
             best = Math.max(best, run)
         }
-        List<LocalDate> streakPeriods = answers.containsKey(current) ? history : history.dropRight(1)
-        result.currentStreak = streakPeriods.reverse().takeWhile { answers[it] }.size()
+        result.currentStreak = answersInOrder.reverse().takeWhile { it }.size()
         result.bestStreak = best
     }
 
@@ -244,8 +278,7 @@ class ProgressCalculator {
         if (!boundaries || !(metric.type in [MetricType.NUMERIC, MetricType.SCALE, MetricType.BOOLEAN])) {
             return []
         }
-        List<GoalObservation> observations = allObservations.findAll { it.observedAt != null && !it.observedAt.after(now) }
-                .sort { a, b -> a.observedAt <=> b.observedAt ?: a.createdDate <=> b.createdDate }
+        List<GoalObservation> observations = recordedByToday(allObservations)
         List<Date> starts = [goal.startDate] + boundaries*.effectiveDate
         List<Date> ends = boundaries*.effectiveDate + [now]
         (0..<starts.size()).collect { int index ->
@@ -283,7 +316,7 @@ class ProgressCalculator {
         LocalDate from = periodOf(toLocalDate(segment.startDate), frequency)
         LocalDate to = last ? current : periodOf(toLocalDate(segment.endDate), frequency).minus(1, unitOf(frequency))
         LocalDate first = [from, answers.keySet().min()].max()
-        List<LocalDate> periods = periodsBetween(first, to, frequency).findAll { it != current || answers.containsKey(current) }
+        List<LocalDate> periods = periodsBetween(first, to, frequency).findAll { answers.containsKey(it) }
         segment.count = periods.size()
         if (periods.size() >= MINIMUM_SEGMENT_POINTS) {
             segment.adherence = periods.count { answers[it] } / (double) periods.size()
@@ -294,9 +327,14 @@ class ProgressCalculator {
         !date.before(segment.startDate) && (last ? !date.after(segment.endDate) : date.before(segment.endDate))
     }
 
+    private List<GoalObservation> recordedByToday(List<GoalObservation> observations) {
+        observations.findAll { it.observedAt != null && !toLocalDate(it.observedAt).isAfter(today) }
+                .sort { a, b -> a.observedAt <=> b.observedAt ?: a.createdDate <=> b.createdDate }
+    }
+
     private static Map<LocalDate, Boolean> answersByPeriod(List<GoalObservation> observations, String frequency) {
         Map<LocalDate, Boolean> answers = [:]
-        observations.each { answers[periodOf(toLocalDate(it.observedAt), frequency)] = !it.missed && it.value == 1d }
+        observations.findAll { !it.missed }.each { answers[periodOf(toLocalDate(it.observedAt), frequency)] = it.value == 1d }
         return answers
     }
 
@@ -326,6 +364,10 @@ class ProgressCalculator {
             periods << period
         }
         return periods
+    }
+
+    private boolean hasStarted(Goal goal) {
+        goal.startDate == null || !toLocalDate(goal.startDate).isAfter(today)
     }
 
     double elapsedFraction(Goal goal) {

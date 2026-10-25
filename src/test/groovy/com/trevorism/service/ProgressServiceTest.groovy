@@ -4,7 +4,9 @@ import com.trevorism.model.Goal
 import com.trevorism.model.GoalAdjustment
 import com.trevorism.model.GoalMetric
 import com.trevorism.model.GoalObservation
+import com.trevorism.model.GoalProfile
 import com.trevorism.model.progress.TreeProgress
+import com.trevorism.model.types.MetricType
 import com.trevorism.support.TestStore
 import org.junit.jupiter.api.Test
 
@@ -20,7 +22,7 @@ import static com.trevorism.support.TestStore.rootGoal
 class ProgressServiceTest {
 
     private final TestStore store = new TestStore()
-    private final ProgressService service = new ProgressService(store.goalRepository, store.metricRepository, store.observationRepository, store.adjustmentRepository)
+    private final ProgressService service = new ProgressService(store.goalRepository, store.metricRepository, store.observationRepository, store.adjustmentRepository, store.profileService())
 
     ProgressServiceTest() {
         service.clock = Clock.fixed(day(183).toInstant(), ZoneOffset.UTC)
@@ -41,6 +43,20 @@ class ProgressServiceTest {
         assert progress.metrics*.metricId == [sessions.id]
         assert progress.metrics[0].score == 0.5d
         assert progress.asOf == day(183)
+    }
+
+    @Test
+    void testTodayIsTheOwnersLocalDay() {
+        store.profileService().update(OWNER, new GoalProfile(timezone: "America/New_York"))
+        Goal root = store.goalService().createRoot(OWNER, rootGoal())
+        GoalMetric walked = store.metricService().create(OWNER, root.id, new GoalMetric(name: "Walked", type: MetricType.BOOLEAN))
+        store.observationService().create(OWNER, walked.id, new GoalObservation(choice: "yes", observedAt: day(181)))
+        service.clock = Clock.fixed(day(183).toInstant().plusSeconds(2 * 3600), ZoneOffset.UTC)
+
+        TreeProgress progress = service.progress(OWNER, root.id)
+
+        assert progress.metrics[0].windowPeriods == 1
+        assert progress.metrics[0].answeredPeriods == 1
     }
 
     @Test

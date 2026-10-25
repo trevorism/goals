@@ -77,6 +77,17 @@ class SegmentTest {
     }
 
     @Test
+    void testYesNoSegmentsCountOnlyRecordedDays() {
+        GoalMetric walked = new GoalMetric(id: "y", goalId: "g", type: MetricType.BOOLEAN, frequency: FrequencyType.DAILY)
+        List<GoalObservation> answers = ((40..49).step(2) + (50..54)).collect { new GoalObservation(observedAt: day(it), value: 1d) }
+
+        List<MetricSegment> segments = calculator.segments(walked, goal, answers, [adjustment("a", 50)])
+
+        assert segments*.count == [5, 5]
+        assert segments*.adherence == [1d, 1d]
+    }
+
+    @Test
     void testOnlyAdjustmentsAfterTheStartAndUpToNowSplitTheHistory() {
         GoalMetric weight = new GoalMetric(id: "w", goalId: "g", type: MetricType.NUMERIC)
 

@@ -5,7 +5,6 @@ import com.trevorism.model.GoalMetric
 import com.trevorism.model.today.TodayItem
 import com.trevorism.model.types.FrequencyType
 import com.trevorism.model.types.GoalStatusType
-import com.trevorism.model.types.MetricSourceType
 import jakarta.inject.Named
 import jakarta.inject.Singleton
 
@@ -31,7 +30,7 @@ class TodayService {
         LocalDate today = parseDay(date)
         Map<String, Goal> goalsById = goalRepository.list(ownerId).collectEntries { [it.id, it] }
         metricRepository.list(ownerId)
-                .findAll { it.enabled != false && (it.source ?: MetricSourceType.MANUAL) == MetricSourceType.MANUAL }
+                .findAll { it.enabled != false }
                 .findAll { GoalMetric metric -> isOpen(goalsById[metric.goalId], goalsById, today) && isDue(metric, today) }
                 .collect { GoalMetric metric -> toItem(metric, goalsById, today) }
                 .sort { a, b -> a.rootTitle <=> b.rootTitle ?: a.goalTitle <=> b.goalTitle ?: a.metric.name <=> b.metric.name }

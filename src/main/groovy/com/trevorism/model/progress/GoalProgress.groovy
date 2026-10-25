@@ -13,4 +13,5 @@ class GoalProgress {
     Double expected
     Double pace
     String status
+    Integer subGoalsWithoutData
 }

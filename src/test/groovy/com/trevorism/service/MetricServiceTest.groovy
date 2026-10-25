@@ -9,7 +9,6 @@ import com.trevorism.model.types.MetricDirectionType
 import com.trevorism.model.types.MetricMeasuresType
 import com.trevorism.model.types.MetricSourceType
 import com.trevorism.model.types.MetricType
-import com.trevorism.secure.Roles
 import com.trevorism.support.TestStore
 import org.junit.jupiter.api.Test
 
@@ -132,53 +131,5 @@ class MetricServiceTest {
         service.create(OWNER, child.id, new GoalMetric(name: "Hours"))
 
         assert service.listForGoal(OWNER, child.id)*.name == ["Hours"]
-    }
-
-    private static GoalMetric payingCustomers(Map properties = [:]) {
-        new GoalMetric([name: "Paying customers", source: MetricSourceType.HTTP, measurementId: MeasurementCatalog.BILLING_PAYING_CUSTOMERS] + properties)
-    }
-
-    @Test
-    void testAnAdminCanAttachTheBillingMeasurement() {
-        GoalMetric metric = service.create(OWNER, root.id, payingCustomers(), [Roles.USER, Roles.ADMIN])
-
-        assert metric.source == MetricSourceType.HTTP
-        assert metric.measurementId == MeasurementCatalog.BILLING_PAYING_CUSTOMERS
-    }
-
-    @Test
-    void testAMeasurementNeedsOneOfItsRoles() {
-        assertBadRequest { service.create(OWNER, root.id, payingCustomers(), [Roles.USER]) }
-        assertBadRequest { service.create(OWNER, root.id, payingCustomers()) }
-        GoalMetric manual = service.create(OWNER, root.id, new GoalMetric(name: "Customers"), [Roles.USER])
-        assertBadRequest { service.update(OWNER, manual.id, payingCustomers(), [Roles.USER]) }
-    }
-
-    @Test
-    void testAMeasuredMetricNeedsAKnownMeasurementOfItsType() {
-        assertBadRequest { service.create(OWNER, root.id, payingCustomers(measurementId: null), [Roles.ADMIN]) }
-        assertBadRequest { service.create(OWNER, root.id, payingCustomers(measurementId: "github.anything"), [Roles.ADMIN]) }
-        assertBadRequest { service.create(OWNER, root.id, payingCustomers(type: MetricType.SCALE, scaleMin: 1, scaleMax: 5), [Roles.ADMIN]) }
-    }
-
-    @Test
-    void testEditingOtherFieldsOfAMeasuredMetricDoesNotRecheckAccess() {
-        GoalMetric metric = service.create(OWNER, root.id, payingCustomers(), [Roles.ADMIN])
-
-        GoalMetric renamed = service.update(OWNER, metric.id, new GoalMetric(name: "Customers who pay", target: 3))
-
-        assert renamed.name == "Customers who pay"
-        assert renamed.measurementId == MeasurementCatalog.BILLING_PAYING_CUSTOMERS
-    }
-
-    @Test
-    void testLeavingMeasuredCollectionClearsTheMeasurement() {
-        GoalMetric metric = service.create(OWNER, root.id, payingCustomers(), [Roles.ADMIN])
-
-        GoalMetric manual = service.update(OWNER, metric.id, new GoalMetric(source: MetricSourceType.MANUAL))
-
-        assert manual.source == MetricSourceType.MANUAL
-        assert manual.measurementId == ""
-        assert service.create(OWNER, root.id, new GoalMetric(name: "Plain", measurementId: MeasurementCatalog.BILLING_PAYING_CUSTOMERS)).measurementId == ""
     }
 }
