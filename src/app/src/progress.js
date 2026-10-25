@@ -398,10 +398,10 @@ export function describeHeadline(row) {
   }
   if (metric.type === MetricType.BOOLEAN && metricProgress.adherence !== null && metricProgress.adherence !== undefined) {
     const target = metric.target !== null && metric.target !== undefined ? ` (target ${formatPercent(metric.target)})` : ''
-    return `${metric.name}: ${formatPercent(metricProgress.adherence)} yes on recorded days${target}`
+    return `${metric.name}: ${formatPercent(metricProgress.adherence)} yes on recorded ${periodName(metric.frequency)}${target}`
   }
-  if (metricProgress.stalled) {
-    return `${metric.name}: needs ${withRate(metric, metricProgress.requiredRate)} to reach ${withUnit(metric, metric.target)} by ${formatDay(row.goal.endDate)}, last 2 weeks ${withRate(metric, metricProgress.recentRate)}`
+  if (metricProgress.stalled && metric.target !== null && metric.target !== undefined) {
+    return `${metric.name}: needs ${withRate(metric, metricProgress.requiredRate)} to reach ${withUnit(metric, metric.target)} by ${formatDay(row.goal.endDate)}, recent trend ${withRate(metric, metricProgress.recentRate)}`
   }
   if (metricProgress.projectedEnd !== null && metricProgress.projectedEnd !== undefined) {
     const target = metric.target !== null && metric.target !== undefined ? ` (target ${withUnit(metric, metric.target)})` : ''
@@ -433,7 +433,7 @@ export function describeMetricProgress(metric, metricProgress) {
     facts.push(`needs ${withRate(metric, metricProgress.requiredRate)}`)
   }
   if (metricProgress.recentRate !== null && metricProgress.recentRate !== undefined) {
-    facts.push(`last 2 weeks ${withRate(metric, metricProgress.recentRate)}`)
+    facts.push(`recent trend ${withRate(metric, metricProgress.recentRate)}`)
   }
   if (metricProgress.projectedEnd !== null && metricProgress.projectedEnd !== undefined && !metricProgress.stalled) {
     facts.push(`on this trend, ${withUnit(metric, metricProgress.projectedEnd)} by the end`)

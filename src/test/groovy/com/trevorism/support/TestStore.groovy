@@ -41,7 +41,7 @@ class TestStore {
     }
 
     ObservationService observationService() {
-        new ObservationService(metricRepository, observationRepository)
+        new ObservationService(metricRepository, observationRepository, profileService())
     }
 
     ProfileService profileService() {

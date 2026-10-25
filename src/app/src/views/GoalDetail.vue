@@ -32,6 +32,7 @@ const selectedGoal = computed(() => selected.value?.goal)
 const selectedMetrics = computed(() => selected.value?.metrics ?? [])
 const isTreeRoot = computed(() => selectedGoal.value?.id === tree.value?.goal.id)
 const progressMaps = computed(() => progressById(progress.value))
+const chartNow = computed(() => (progress.value?.today ? `${progress.value.today}T00:00:00Z` : progress.value?.asOf ?? null))
 const selectedProgress = computed(() => progressMaps.value.goals[selectedId.value] ?? null)
 const headlineExpected = computed(() => {
   const goalProgress = selectedProgress.value
@@ -251,7 +252,7 @@ onMounted(load)
             :metric="metric"
             :goal="selectedGoal"
             :metric-progress="progressMaps.metrics[metric.id] ?? null"
-            :now="progress?.asOf ?? null"
+            :now="chartNow"
             :segments="progressMaps.segments[metric.id] ?? []"
             :delegate-labels="delegateLabels"
             @changed="load"

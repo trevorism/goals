@@ -154,9 +154,9 @@ describe('progress facts', () => {
     const weight = { type: 'numeric', unit: 'lb' }
 
     expect(describeMetricProgress(weight, { requiredRate: -1.3, recentRate: -0.04, projectedEnd: 207.1, stalled: true }))
-      .toEqual(['needs −1.3 lb/wk', 'last 2 weeks 0.0 lb/wk'])
+      .toEqual(['needs −1.3 lb/wk', 'recent trend 0.0 lb/wk'])
     expect(describeMetricProgress(weight, { requiredRate: -1.3, recentRate: -1.5, projectedEnd: 199, stalled: false }))
-      .toEqual(['needs −1.3 lb/wk', 'last 2 weeks −1.5 lb/wk', 'on this trend, 199 lb by the end'])
+      .toEqual(['needs −1.3 lb/wk', 'recent trend −1.5 lb/wk', 'on this trend, 199 lb by the end'])
   })
 
   it('describes adherence and streaks', () => {
@@ -237,14 +237,16 @@ describe('dashboard headline', () => {
 
   it('describes a habit headline by its share of yes answers', () => {
     expect(describeHeadline(goalRow({ name: 'Walked', type: 'boolean', target: 0.85 }, { adherence: 0.7, score: 0.82 }))).toBe('Walked: 70% yes on recorded days (target 85%)')
+    expect(describeHeadline(goalRow({ name: 'Worked on it', type: 'boolean', frequency: 'weekly' }, { adherence: 0.75, score: 0.75 }))).toBe('Worked on it: 75% yes on recorded weeks')
   })
 
   it('names the required rate instead of a projection when the recent trend has stalled', () => {
     const weight = { name: 'Weight', type: 'numeric', unit: 'lb', target: 200, direction: 'decrease' }
     const stalled = { score: 0.3, projectedEnd: 207.1, requiredRate: -1.3, recentRate: 0, stalled: true }
 
-    expect(describeHeadline(goalRow(weight, stalled))).toBe('Weight: needs −1.3 lb/wk to reach 200 lb by Apr 11, 2027, last 2 weeks 0.0 lb/wk')
+    expect(describeHeadline(goalRow(weight, stalled))).toBe('Weight: needs −1.3 lb/wk to reach 200 lb by Apr 11, 2027, recent trend 0.0 lb/wk')
     expect(describeHeadline(goalRow(weight, { ...stalled, stalled: false }))).toContain('on this trend, 207.1 lb')
+    expect(describeHeadline(goalRow({ ...weight, target: null }, stalled))).toContain('on this trend')
   })
 
   it('falls back to the score, then to effort, then to a hint', () => {

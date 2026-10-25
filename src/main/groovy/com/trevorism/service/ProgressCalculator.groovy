@@ -64,7 +64,7 @@ class ProgressCalculator {
         List<MetricSegment> segmentResults = metrics.findAll { goalsById.containsKey(it.goalId) }.collectMany { GoalMetric metric ->
             segments(metric, goalsById[metric.goalId], observationsByMetric[metric.id] ?: [], adjustmentsByMetric[metric.id] ?: [])
         }
-        new TreeProgress(asOf: now, goals: goalResults.values().toList(), metrics: metricResults, segments: segmentResults)
+        new TreeProgress(asOf: now, today: today.toString(), goals: goalResults.values().toList(), metrics: metricResults, segments: segmentResults)
     }
 
     private GoalProgress goalProgress(Goal goal, Map<String, List<Goal>> childrenByParent, Map<String, List<GoalMetric>> metricsByGoal,
@@ -167,13 +167,15 @@ class ProgressCalculator {
             return
         }
         result.score = fractionToward(result.current, baseline, target, metric.direction)
+        if (metric.target != null) {
+            measureRates(goal, points, metric.target, metric.direction, result)
+        }
         if (fit) {
             double endX = daysFromStart(goal, goal.endDate)
             result.projectedEnd = scale ? Math.max(metric.scaleMin, Math.min(metric.scaleMax, fit.valueAt(endX))) : fit.valueAt(endX)
             result.projectedProgress = fractionToward(result.projectedEnd, baseline, target, metric.direction)
             result.projectedTargetDate = projectedTargetDate(goal, fit, result.current, target, metric.direction, endX)
         }
-        measureRates(goal, points, target, metric.direction, result)
     }
 
     private void measureRates(Goal goal, List<double[]> points, double target, String direction, MetricProgress result) {
@@ -183,8 +185,9 @@ class ProgressCalculator {
             result.requiredRate = (target - latest) / weeksLeft
         }
         List<double[]> recent = recentPoints(goal, points)
-        if (recent.size() >= MINIMUM_RECENT_POINTS) {
-            result.recentRate = LinearFit.of(recent).slope * DAYS_PER_WEEK
+        LinearFit recentFit = recent.size() >= MINIMUM_RECENT_POINTS ? LinearFit.of(recent) : null
+        if (recentFit) {
+            result.recentRate = recentFit.slope * DAYS_PER_WEEK
         }
         if (result.requiredRate != null && result.recentRate != null) {
             double recentTowardTarget = result.recentRate * Math.signum(result.requiredRate)
@@ -247,10 +250,11 @@ class ProgressCalculator {
             return
         }
         LocalDate current = periodOf(today, frequency)
-        LocalDate windowStart = current.minus(windowPeriods(frequency) - 1, unitOf(frequency))
+        LocalDate windowEnd = answers.containsKey(current) ? current : current.minus(1, unitOf(frequency))
+        LocalDate windowStart = windowEnd.minus(windowPeriods(frequency) - 1, unitOf(frequency))
         LocalDate trackingStart = [windowStart, answers.keySet().min(), periodOf(toLocalDate(goal.startDate), frequency)].max()
 
-        List<LocalDate> window = periodsBetween(trackingStart, current, frequency).findAll { it != current || answers.containsKey(current) }
+        List<LocalDate> window = periodsBetween(trackingStart, windowEnd, frequency)
         List<LocalDate> answered = window.findAll { answers.containsKey(it) }
         result.windowPeriods = window.size()
         result.answeredPeriods = answered.size()
@@ -273,7 +277,7 @@ class ProgressCalculator {
 
     List<MetricSegment> segments(GoalMetric metric, Goal goal, List<GoalObservation> allObservations, List<GoalAdjustment> adjustments) {
         List<GoalAdjustment> boundaries = adjustments
-                .findAll { it.effectiveDate != null && it.effectiveDate.after(goal.startDate) && !it.effectiveDate.after(now) }
+                .findAll { it.effectiveDate != null && it.effectiveDate.after(goal.startDate) && !toLocalDate(it.effectiveDate).isAfter(today) }
                 .sort { it.effectiveDate }
         if (!boundaries || !(metric.type in [MetricType.NUMERIC, MetricType.SCALE, MetricType.BOOLEAN])) {
             return []
@@ -324,7 +328,7 @@ class ProgressCalculator {
     }
 
     private static boolean inSegment(Date date, MetricSegment segment, boolean last) {
-        !date.before(segment.startDate) && (last ? !date.after(segment.endDate) : date.before(segment.endDate))
+        !date.before(segment.startDate) && (last || date.before(segment.endDate))
     }
 
     private List<GoalObservation> recordedByToday(List<GoalObservation> observations) {

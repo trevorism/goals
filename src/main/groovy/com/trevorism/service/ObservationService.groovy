@@ -8,6 +8,10 @@ import com.trevorism.model.types.MetricType
 import jakarta.inject.Named
 import jakarta.inject.Singleton
 
+import java.time.Clock
+import java.time.LocalDate
+import java.time.ZoneOffset
+
 import static com.trevorism.service.Validation.require
 import static com.trevorism.service.Validation.requireOneOf
 
@@ -16,11 +20,15 @@ class ObservationService {
 
     private final OwnedRepository<GoalMetric> metricRepository
     private final OwnedRepository<GoalObservation> observationRepository
+    private final ProfileService profileService
+    Clock clock = Clock.systemUTC()
 
     ObservationService(@Named("metric") OwnedRepository<GoalMetric> metricRepository,
-                       @Named("observation") OwnedRepository<GoalObservation> observationRepository) {
+                       @Named("observation") OwnedRepository<GoalObservation> observationRepository,
+                       ProfileService profileService) {
         this.metricRepository = metricRepository
         this.observationRepository = observationRepository
+        this.profileService = profileService
     }
 
     List<GoalObservation> listForMetric(String ownerId, String metricId) {
@@ -31,7 +39,7 @@ class ObservationService {
     GoalObservation create(String ownerId, String metricId, GoalObservation observation) {
         GoalMetric metric = metricRepository.get(ownerId, metricId)
         observation.metricId = metric.id
-        observation.observedAt = observation.observedAt ?: new Date()
+        observation.observedAt = observation.observedAt ?: ownersToday(ownerId)
         observation.metricSource = observation.metricSource ?: MetricSourceType.MANUAL
         requireOneOf(observation.metricSource, MetricSourceType.ALL, "metricSource")
         observation.missed = observation.missed ?: false
@@ -123,5 +131,9 @@ class ObservationService {
         require(index >= 0, "the observation requires one of the metric's choices: ${choices*.value}")
         observation.label = choices[index].label
         return index
+    }
+
+    private Date ownersToday(String ownerId) {
+        Date.from(LocalDate.now(clock.withZone(profileService.zoneFor(ownerId))).atStartOfDay(ZoneOffset.UTC).toInstant())
     }
 }

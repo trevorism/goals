@@ -369,6 +369,40 @@ class ProgressCalculatorTest {
     }
 
     @Test
+    void testValuesOnASingleDayHaveNoRecentRate() {
+        GoalMetric weight = metric(type: MetricType.NUMERIC, baseline: 200d, target: 180d, direction: MetricDirectionType.DECREASE)
+
+        MetricProgress result = progressOf(weight, values([50: 199d]) + values([50: 198d]) + values([50: 197d]) + values([50: 198d]) + values([50: 199d]))
+
+        assert result.recentRate == null
+        assert result.stalled == null
+        assert result.requiredRate != null
+    }
+
+    @Test
+    void testAScaleWithoutAnExplicitTargetHasNoRates() {
+        GoalMetric mood = metric(type: MetricType.SCALE, scaleMin: 1d, scaleMax: 5d)
+
+        MetricProgress result = progressOf(mood, values((40..50).collectEntries { [it, 3d] }))
+
+        assert result.score != null
+        assert result.requiredRate == null
+        assert result.recentRate == null
+        assert result.stalled == null
+    }
+
+    @Test
+    void testAnUnrecordedTodayLeavesAFullWindowEndingYesterday() {
+        GoalMetric walked = metric(type: MetricType.BOOLEAN)
+        Map<Integer, Boolean> byDay = [22: false] + (23..49).collectEntries { [it, true] }
+
+        MetricProgress result = progressOf(walked, answers(byDay))
+
+        assert result.windowPeriods == 28
+        assert near(result.adherence, 27 / 28d)
+    }
+
+    @Test
     void testTheOwnersLocalDayDecidesWhatCountsAsToday() {
         GoalMetric walked = metric(type: MetricType.BOOLEAN)
         ProgressCalculator eveningInNewYork = new ProgressCalculator(NOW, START.plusDays(49))

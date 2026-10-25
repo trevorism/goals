@@ -220,7 +220,7 @@ scored metric produces a **progress score p ∈ [0, 1]**. `ProgressCalculator` c
 | Type | Collected as | Score p | Chart |
 |---|---|---|---|
 | numeric | number | `clamp((current − baseline) / (target − baseline))`. `current` is the fitted value at the latest observation (the latest value when there are fewer than 3). A missing baseline uses the first value; no target means no score. For `maintain`, the share of the last 7 values within `tolerance` of the target. | Values, trend fit, plan line, target line or tolerance band |
-| boolean | Yes/No → 1/0 | `min(adherence / target, 1)`, or adherence when there's no target. Adherence is the share of **recorded** periods answered Yes over the last 28 days (daily) or 4 periods (weekly, monthly), counted from the first answer. Unrecorded periods are left out; `answeredperiods` of `windowperiods` reports the coverage, and the UI marks coverage under half as partial data. No recorded period in the window means no score. The latest answer in a period wins. | Rolling adherence over recorded periods with a target line; current and best streak, where unrecorded periods don't break a streak |
+| boolean | Yes/No → 1/0 | `min(adherence / target, 1)`, or adherence when there's no target. Adherence is the share of **recorded** periods answered Yes over the last 28 days (daily) or 4 periods (weekly, monthly), counted from the first answer. Unrecorded periods are left out; `answeredperiods` of `windowperiods` reports the coverage, and the UI marks coverage under half as partial data. The window ends today when today is recorded, otherwise yesterday, so it always spans a full 28 days or 4 periods. No recorded period in the window means no score. The latest answer in a period wins. | Rolling adherence over recorded periods with a target line; current and best streak, where unrecorded periods don't break a streak |
 | scale | scale points | Mean of the last 7 values, normalized between baseline and target (defaulting to the scale's ends) | Values, trend fit, plan line, target line |
 | choice | choices, ordered worst to best | Mean of position ÷ (choices − 1) over the last 7 answers | Answers on a worst→best axis |
 | text | free text | Not scored | None; the journal list under the card |
@@ -237,7 +237,7 @@ owner's local today are ignored. "Today" is the owner's local date, from the pro
   that. **No data** when there's no score.
 - **At risk:** a metric that is ahead or on track, but whose trend projects below 0.9 of the way to
   its target at the end date.
-- **Required and recent rate** (numeric and scale, not `maintain`): `requiredrate` is the change per
+- **Required and recent rate** (numeric and scale with an explicit target, not `maintain`): `requiredrate` is the change per
   week needed from the latest value to reach the target by the end date. `recentrate` is the fitted
   change per week over the last 14 days, or over the last 5 values when 14 days hold fewer. A trend is
   **stalled** when its recent rate moves toward the target at less than a quarter of the required
