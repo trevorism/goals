@@ -12,7 +12,8 @@ import {
   formatPercent,
   periodOf,
   progressById,
-  rollingAdherence
+  rollingAdherence,
+  weeklyYesCounts
 } from '../src/progress.js'
 
 const DAY = 86_400_000
@@ -138,6 +139,44 @@ describe('choice chart and dispatch', () => {
   it('picks the chart by metric type and draws none for text', () => {
     expect(buildMetricChart({ type: 'text' }, goal, [], null, now)).toBeNull()
     expect(buildMetricChart(meals, goal, [], null, now).data.datasets[0].label).toBe('Answers')
+  })
+})
+
+describe('per-period targets', () => {
+  const running = { name: 'Running', type: 'boolean', frequency: 'daily', timesPerWeek: 3 }
+  const monday = Date.UTC(2027, 1, 15)
+  const on = (offset, yes) => ({ observedAt: new Date(monday + offset * DAY).toISOString(), value: yes ? 1 : 0 })
+
+  it('counts yes days per week for the weekly chart', () => {
+    const observations = [on(-7, true), on(-5, true), on(-4, false), on(0, true), on(10, true)]
+
+    expect(weeklyYesCounts(observations, new Date(monday + 3 * DAY))).toEqual([{ x: monday - 7 * DAY, y: 2 }, { x: monday, y: 1 }])
+  })
+
+  it('charts weekly yes counts against the times per week', () => {
+    const chart = buildMetricChart(running, goal, [on(-7, true)], null, new Date(monday + 3 * DAY))
+
+    expect(chart.data.datasets[0].label).toBe('Yes days')
+    expect(chart.options.plugins.annotation.annotations.target.yMin).toBe(3)
+    expect(chart.options.plugins.annotation.annotations.target.label.content).toBe('3× per week')
+    expect([chart.options.scales.y.min, chart.options.scales.y.max]).toEqual([0, 7])
+  })
+
+  it('describes weeks met, this week and the weekly streak', () => {
+    const progress = { score: 0.75, adherence: 0.75, answeredPeriods: 4, windowPeriods: 4, currentPeriodCount: 2, currentStreak: 2, bestStreak: 3 }
+
+    expect(describeScore(running, 0.75)).toBe('75% of weeks met')
+    expect(describeMetricProgress(running, progress)).toEqual(['3 of 4 weeks met', 'this week 2 of 3', 'streak 2 weeks (best 3)'])
+    expect(describeHeadline({ goal: { endDate: day(100) }, progress: {}, headlineMetric: running, headlineMetricProgress: progress })).toBe('Running: 3 of 4 weeks met (3× per week)')
+  })
+
+  it('draws only a target line for at least and at most metrics', () => {
+    const meals = { type: 'numeric', direction: 'at_least', target: 4, baseline: 0, unit: 'meals' }
+    const chart = buildTrendChart(meals, goal, [{ observedAt: day(10), value: 5 }], null, now)
+
+    expect(chart.data.datasets.map((dataset) => dataset.label)).toEqual(['Values'])
+    expect(chart.options.plugins.annotation.annotations.target.yMin).toBe(4)
+    expect(describeScore(meals, 0.5)).toBe('50% of recent values at target')
   })
 })
 
