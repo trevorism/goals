@@ -162,6 +162,13 @@ describe('per-period targets', () => {
     expect([chart.options.scales.y.min, chart.options.scales.y.max]).toEqual([0, 7])
   })
 
+  it('keeps the first week on the chart when the goal starts midweek', () => {
+    const midweekGoal = { startDate: new Date(monday + 2 * DAY).toISOString(), endDate: day(100) }
+    const chart = buildMetricChart(running, midweekGoal, [on(2, true), on(3, true)], null, new Date(monday + 4 * DAY))
+
+    expect(chart.data.datasets[0].data).toEqual([{ x: monday + 2 * DAY, y: 2 }])
+  })
+
   it('describes weeks met, this week and the weekly streak', () => {
     const progress = { score: 0.75, adherence: 0.75, answeredPeriods: 4, windowPeriods: 4, currentPeriodCount: 2, currentStreak: 2, bestStreak: 3 }
 

@@ -122,7 +122,7 @@ export function validateMetric(form) {
       return 'The target must be between 1% and 100%'
     }
     const times = toNumber(form.timesPerWeek)
-    if (form.frequency === 'daily' && times !== null && !(Number.isInteger(times) && times >= 1 && times <= 7)) {
+    if (form.frequency === 'daily' && times !== null && times !== 0 && !(Number.isInteger(times) && times >= 1 && times <= 7)) {
       return 'Times per week must be a whole number from 1 to 7'
     }
   }

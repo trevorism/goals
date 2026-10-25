@@ -369,7 +369,9 @@ export function buildWeeklyCountChart(metric, goal, observations, now, segments 
   const times = timesPerWeekOf(metric)
   const annotations = adjustmentMarkers(segments)
   annotations.target = targetLine(metric, times, -10, `${times}× per week`)
-  const datasets = [{ label: 'Yes days', data: weeklyYesCounts(observations, now), ...pointStyle(chartColors.values) }]
+  const start = time(goal.startDate)
+  const points = weeklyYesCounts(observations, now).map((point) => ({ x: Math.max(point.x, start), y: point.y }))
+  const datasets = [{ label: 'Yes days', data: points, ...pointStyle(chartColors.values) }]
   const options = baseOptions(goal, now, { min: 0, max: 7, ticks: { stepSize: 1 } }, annotations, false)
   options.plugins.tooltip.callbacks.label = (item) => `${item.parsed.y} yes that week`
   return { data: { datasets }, options }

@@ -75,6 +75,8 @@ describe('metrics', () => {
     expect(validateMetric({ ...running, timesPerWeek: '8' })).toBe('Times per week must be a whole number from 1 to 7')
     expect(validateMetric({ ...running, timesPerWeek: '2.5' })).toBe('Times per week must be a whole number from 1 to 7')
     expect(validateMetric(running)).toBe('')
+    expect(validateMetric({ ...running, timesPerWeek: '0' })).toBe('')
+    expect(buildMetricPayload({ ...running, timesPerWeek: '0' })).toMatchObject({ timesPerWeek: 0 })
   })
 
   it('requires a target for at least and at most metrics', () => {
